@@ -227,6 +227,7 @@ class ScalingDeductionInvoiceTest extends TestCase
         DB::table('truck_loads')->where('id', $existingLoad->id)->update([
             'created_at' => now()->subYear(),
         ]);
+        $existingLoad->delete();
 
         $response = $this->actingAs($user)->post(route('scaling.store'), [
             'supplier_name' => $supplier->name,

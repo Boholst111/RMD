@@ -337,7 +337,8 @@ class ScalingController extends Controller
 
             // The locked counter serializes creates; derive invoice sequence from invoice numbers, not timestamps.
             $invoicePrefix = "RMD-{$currentYear}-";
-            $lastInvoiceSequence = TruckLoad::where('invoice_no', 'like', $invoicePrefix . '%')
+            $lastInvoiceSequence = TruckLoad::withTrashed()
+                ->where('invoice_no', 'like', $invoicePrefix . '%')
                 ->pluck('invoice_no')
                 ->reduce(function (int $highest, string $invoiceNumber) use ($invoicePrefix): int {
                     $sequence = substr($invoiceNumber, strlen($invoicePrefix));
