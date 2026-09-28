@@ -1,8 +1,6 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Models\User;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ScalingController;
@@ -11,93 +9,6 @@ use App\Http\Middleware\CheckRole;
 
 // Public Landing Page
 Route::get('/', [LandingController::class, 'index'])->name('landing');
-
-// Temporary production debug endpoint (remove after verification)
-Route::get('/debug/users', function (Request $request) {
-    $secret = env('DB_DEBUG_SECRET', 'rmd-debug-2026');
-    if ($request->query('secret') !== $secret) {
-        abort(404);
-    }
-
-    return response()->json([
-        'active_env' => env('APP_ENV'),
-        'db_host' => config('database.connections.mysql.host'),
-        'db_port' => config('database.connections.mysql.port'),
-        'db_database' => config('database.connections.mysql.database'),
-        'db_username' => config('database.connections.mysql.username'),
-        'db_password_is_set' => ! empty(config('database.connections.mysql.password')),
-        'user_count' => User::count(),
-        'users' => User::select('id', 'email', 'role', 'status')->orderBy('id')->limit(10)->get(),
-    ]);
-})->name('debug.users');
-
-// Debug: per-scale-sheet breakdown (protected by DB_DEBUG_SECRET)
-Route::get('/debug/scale-breakdown/{truckLoad}', function (Request $request, $truckLoad) {
-    $secret = env('DB_DEBUG_SECRET', 'rmd-debug-2026');
-    if ($request->query('secret') !== $secret) {
-        abort(404);
-    }
-
-    $tl = \App\Models\TruckLoad::with(['supplier'])->find($truckLoad);
-    if (! $tl) {
-        return response()->json(['error' => 'not_found'], 404);
-    }
-
-    $items = \App\Models\ScaleItem::where('truck_load_id', $tl->id)->get();
-
-    $bracketOrder = ['20-24', 'Sawmill (SM)', '26-28', '30-38', '40-48', '50-58', '60-80'];
-    $groupedBrackets = [];
-    foreach ($bracketOrder as $b) {
-        $groupedBrackets[$b] = ['bracket' => $b, 'pieces' => 0, 'total_volume' => 0.0, 'rate' => 0.0, 'subtotal' => 0.0];
-    }
-
-    foreach ($items as $item) {
-        $grade = $item->grade ?? 'Good';
-        $dia = (int) $item->diameter;
-        if ($grade === 'Sawmill') {
-            $b = 'Sawmill (SM)';
-        } elseif ($dia <= 24) {
-            $b = '20-24';
-        } elseif ($dia <= 28) {
-            $b = '26-28';
-        } elseif ($dia <= 38) {
-            $b = '30-38';
-        } elseif ($dia <= 48) {
-            $b = '40-48';
-        } elseif ($dia <= 58) {
-            $b = '50-58';
-        } else {
-            $b = '60-80';
-        }
-
-        $groupedBrackets[$b]['pieces'] += (int) $item->quantity;
-        $groupedBrackets[$b]['total_volume'] += (float) $item->total_volume;
-        $groupedBrackets[$b]['rate'] = (float) $item->price_per_cu_m;
-        $groupedBrackets[$b]['subtotal'] += (float) $item->subtotal;
-    }
-
-    foreach ($groupedBrackets as $k => $row) {
-        if (($row['pieces'] ?? 0) <= 0) {
-            $groupedBrackets[$k]['subtotal'] = 0.0;
-            $groupedBrackets[$k]['total_volume'] = 0.0;
-        }
-    }
-
-    $breakdown = array_values(array_filter($groupedBrackets, fn($r) => ($r['pieces'] ?? 0) > 0 || ($r['total_volume'] ?? 0) > 0));
-    if (empty($breakdown)) {
-        $breakdown = array_values($groupedBrackets);
-    }
-
-    return response()->json([
-        'truck_load_id' => $tl->id,
-        'scale_sheet_no' => $tl->scale_sheet_no,
-        'total_logs' => $tl->total_logs,
-        'total_volume' => $tl->total_volume,
-        'gross_amount' => $tl->gross_amount,
-        'breakdown' => $breakdown,
-        'items' => $items,
-    ]);
-})->name('debug.scale-breakdown');
 
 // Authentication Routes (Guest Only)
 Route::middleware('guest')->group(function () {

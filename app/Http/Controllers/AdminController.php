@@ -22,9 +22,6 @@ class AdminController extends Controller
      */
     public function dashboard()
     {
-        // Hard purge Lauan and Yemane records from database
-        PriceMatrix::whereIn('category', ['LAUAN', 'YEMANE', 'Lauan', 'Yemane', 'lauan', 'yemane'])->delete();
-
         $staffUsers = User::orderBy('name')->get();
         $suppliers = Supplier::orderBy('name')->get();
         $priceMatrices = PriceMatrix::orderBy('category')
@@ -198,9 +195,19 @@ class AdminController extends Controller
         DB::transaction(function () use ($validated) {
             foreach ($validated['prices'] as $item) {
                 $pm = PriceMatrix::find($item['id']);
-                if ($pm) {
-                    $pm->price_per_cu_m = (float) $item['price'];
-                    $pm->save();
+                if (! $pm) {
+                    continue;
+                }
+
+                $matchingRows = PriceMatrix::where('category', $pm->category)
+                    ->where('length', $pm->length)
+                    ->where('dia_min', $pm->dia_min)
+                    ->where('dia_max', $pm->dia_max)
+                    ->get();
+
+                foreach ($matchingRows as $matchingRow) {
+                    $matchingRow->price_per_cu_m = (float) $item['price'];
+                    $matchingRow->save();
                 }
             }
         });

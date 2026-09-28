@@ -26,3 +26,22 @@ Thumbs.db
 # Ignore generated Laravel files and local SQLite database
 bootstrap/cache/*.php
 database/database.sqlite
+
+# Local deployment diagnostics and generated output
+/buildlogs.txt
+/connect*.txt
+/db_verify_temp.php
+/deployment_list.json
+/first()
+/output.txt
+/railway-query.graphql
+/railway_connect_output.txt
+/role
+/status
+/status.json
+/testoutput.txt
+/tmp_render*.html
+/toArray())
+/*.sql
+/*.sql.gz
+/*.dump

@@ -62,10 +62,7 @@ let rowIndex = 0;
 // Rate cache to avoid repeated API calls for same spec
 const rateCache = {};
 
-/**
- * STRICT DYNAMIC RATE FETCHING: Query backend for fresh rates
- * Falls back to embedded priceMatrix array only if API fails
- */
+/** Resolve rates from the fresh matrix embedded in this server response. */
 function getMatchingRate(category, length, diameter, grade) {
     const normCategory = String(category || '').trim().toUpperCase();
     const normGrade = String(grade || '').trim().toUpperCase();
@@ -80,32 +77,7 @@ function getMatchingRate(category, length, diameter, grade) {
 
     let rate = 0;
 
-    // Try to fetch fresh rate from backend API (synchronous via XMLHttpRequest)
-    // This ensures we always have the latest rates from superadmin updates
-    try {
-        const xhr = new XMLHttpRequest();
-        const apiUrl = '{{ route("api.get-rate") }}?category=' + encodeURIComponent(normCategory) + '&length=' + len + '&diameter=' + dia + '&grade=' + encodeURIComponent(normGrade);
-        xhr.open('GET', apiUrl, false);
-        xhr.setRequestHeader('Accept', 'application/json');
-        xhr.send();
-        
-        if (xhr.status === 200) {
-            const data = JSON.parse(xhr.responseText);
-            rate = parseFloat(data.rate) || 0;
-            rateCache[cacheKey] = rate;
-            if (rate > 0) {
-                console.debug(`API rate fetched: ${normCategory} ${dia}cm ${len}m ${normGrade} = ₱${rate}`);
-            }
-            return rate;
-        } else {
-            console.warn(`API returned status ${xhr.status} for rate lookup: ${normCategory} ${dia}cm ${len}m ${normGrade}`);
-        }
-    } catch (e) {
-        console.warn('API rate lookup failed, falling back to embedded data:', e.message);
-    }
-
-    // FALLBACK: Use embedded priceMatrix array if API fails
-    // 1. Sawmill Grade check
+    // Sawmill Grade check
     if (normGrade === 'SAWMILL' || normGrade === 'SAWMILL (SM)') {
         const sawmillDb = priceMatrix.find(r => {
             const cat = String(r.category || '').toUpperCase();
@@ -129,7 +101,7 @@ function getMatchingRate(category, length, diameter, grade) {
         return 0.00;
     }
 
-    // 2. Exact match in priceMatrix by category, length, and diameter range
+    // Exact match in priceMatrix by category, length, and diameter range
     const dbMatch = priceMatrix.find(r => {
         const catMatch = String(r.category || '').toUpperCase() === normCategory || normCategory === 'FALCATA' || String(r.category || '').toUpperCase() === 'FALCATA';
         const lenMatch = Math.abs(parseFloat(r.length) - len) < 0.05;
@@ -145,7 +117,7 @@ function getMatchingRate(category, length, diameter, grade) {
         return rate;
     }
 
-    // 3. Fallback match without strict length constraint
+    // Fallback match without strict length constraint
     const dbMatchAnyLength = priceMatrix.find(r => {
         const catMatch = String(r.category || '').toUpperCase() === normCategory || normCategory === 'FALCATA' || String(r.category || '').toUpperCase() === 'FALCATA';
         const diaMin = parseInt(r.dia_min, 10);
@@ -185,6 +157,7 @@ function addRow(data = { category: defaultCategory, grade: 'Good', is_split: fal
         const defaultDiaB = data.diameterB || data.diameter || 20;
 
         tr.innerHTML = `
+            <td hidden>
             <!-- Part A hidden inputs -->
             <input type="hidden" name="items[${rowIndex}_A][is_split]" value="1">
             <input type="hidden" name="items[${rowIndex}_A][split_group_id]" value="split_${rowIndex}">
@@ -212,6 +185,7 @@ function addRow(data = { category: defaultCategory, grade: 'Good', is_split: fal
             <input type="hidden" name="items[${rowIndex}_B][volume]" class="row-volume-hidden-b" value="0.000">
             <input type="hidden" name="items[${rowIndex}_B][total_volume]" class="row-total-volume-hidden-b" value="0.000">
             <input type="hidden" name="items[${rowIndex}_B][subtotal]" class="row-subtotal-hidden-b" value="0.00">
+            </td>
 
             <td class="px-3 py-3 text-center text-xs text-slate-500 font-mono row-num">1</td>
             
@@ -284,6 +258,7 @@ function addRow(data = { category: defaultCategory, grade: 'Good', is_split: fal
         `;
 
         document.getElementById('splitMatrixBody').appendChild(tr);
+        tr.querySelectorAll('[name]').forEach(control => control.setAttribute('form', 'scaleForm'));
 
         const syncInputs = () => {
             const cat = tr.querySelector('.row-cat-select').value;
@@ -399,9 +374,11 @@ function addRow(data = { category: defaultCategory, grade: 'Good', is_split: fal
         const defaultLen = data.length || '2.6';
 
         tr.innerHTML = `
+            <td hidden>
             <input type="hidden" name="items[${rowIndex}][volume]" class="row-vol-hidden" value="0.000">
             <input type="hidden" name="items[${rowIndex}][total_volume]" class="row-total-vol-hidden" value="0.000">
             <input type="hidden" name="items[${rowIndex}][subtotal]" class="row-subtotal-hidden" value="0.00">
+            </td>
             <td class="px-3 py-3 text-center text-xs text-slate-500 font-mono row-num">1</td>
             
             <td class="px-3 py-3">
@@ -450,6 +427,7 @@ function addRow(data = { category: defaultCategory, grade: 'Good', is_split: fal
         `;
 
         document.getElementById('standardMatrixBody').appendChild(tr);
+        tr.querySelectorAll('[name]').forEach(control => control.setAttribute('form', 'scaleForm'));
 
         ['row-cat', 'row-grade', 'row-len', 'row-dia', 'row-qty'].forEach(cls => {
             tr.querySelector(`.${cls}`).addEventListener('change', recalculateAll);
@@ -697,30 +675,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // Set auto-refresh timer (refresh every 5 minutes to catch superadmin updates)
     setInterval(autoRefreshPrices, 5 * 60 * 1000);
 
-    // Load initial rows for Box 1 (Standard) with default length 2.6m
-    initialRows.forEach(row => addRow({
-        category: row.category,
-        grade: row.grade,
-        is_split: false,
-        length: '2.6',
-        diameter: row.diameter,
-        quantity: 0,
-        isPreset: true
-    }));
+    // Edit pages restore only saved rows in their own DOMContentLoaded handler.
+    if (!document.getElementById('items_json')) {
+        initialRows.forEach(row => addRow({
+            category: row.category,
+            grade: row.grade,
+            is_split: false,
+            length: '2.6',
+            diameter: row.diameter,
+            quantity: 0,
+            isPreset: true
+        }));
 
-    // Load initial rows for Box 2 (Split) with default Part A = 1.3m Good, Part B = 1.3m Sawmill
-    initialRows.forEach(row => addRow({
-        category: row.category,
-        gradeA: 'Good',
-        lengthA: '1.3',
-        diameterA: row.diameter,
-        gradeB: 'Sawmill',
-        lengthB: '1.3',
-        diameterB: row.diameter,
-        is_split: true,
-        quantity: 0,
-        isPreset: false
-    }));
+        initialRows.forEach(row => addRow({
+            category: row.category,
+            gradeA: 'Good',
+            lengthA: '1.3',
+            diameterA: row.diameter,
+            gradeB: 'Sawmill',
+            lengthB: '1.3',
+            diameterB: row.diameter,
+            is_split: true,
+            quantity: 0,
+            isPreset: false
+        }));
+    }
 
     document.getElementById('addRowBtn').addEventListener('click', () => addRow({
         category: defaultCategory,

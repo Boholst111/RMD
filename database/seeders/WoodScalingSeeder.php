@@ -16,6 +16,10 @@ class WoodScalingSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            throw new \RuntimeException('WoodScalingSeeder is for non-production environments only.');
+        }
+
         // 0. Create Default Users (Super Admin & Admin Scaler)
         $superAdmin = User::firstOrCreate(
             ['email' => 'superadmin@rmd.com'],
@@ -69,9 +73,7 @@ class WoodScalingSeeder extends Seeder
             'address' => 'San Francisco, Agusan del Sur',
         ]);
 
-        // 2. Preserve PEELABLE / F1(1.3/2.6) seed data while refreshing Pure FALCATA Price Matrix
-        PriceMatrix::whereNotIn('category', ['FALCATA', 'SAWMILL', 'PEELABLE / F1(1.3/2.6)'])->delete();
-
+        // 2. Refresh the demo FALCATA and SAWMILL rows without deleting custom categories.
         $falcataRanges = [
             ['min' => 16, 'max' => 18, 'price' => 1400.00],
             ['min' => 20, 'max' => 24, 'price' => 1800.00],

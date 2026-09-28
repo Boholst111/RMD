@@ -242,41 +242,41 @@
                     <!-- Driver's Assistance -->
                     <div>
                         <label for="drivers_assistance" class="block text-xs font-semibold text-slate-400 mb-1">Driver's Assistance (₱)</label>
-                        <input type="number" step="0.01" min="0" name="drivers_assistance" id="drivers_assistance" value="{{ old('drivers_assistance', '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="number" step="0.01" min="0" name="drivers_assistance" id="drivers_assistance" form="scaleForm" value="{{ old('drivers_assistance', '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
 
                     <!-- Expenses Deduction -->
                     <div>
                         <label for="expenses_deduction" class="block text-xs font-semibold text-slate-400 mb-1">Expenses Deduction (₱)</label>
-                        <input type="number" step="0.01" min="0" name="expenses_deduction" id="expenses_deduction" value="{{ old('expenses_deduction', '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="number" step="0.01" min="0" name="expenses_deduction" id="expenses_deduction" form="scaleForm" value="{{ old('expenses_deduction', '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
 
                     <!-- Travel Paper Deduction -->
                     <div>
                         <label for="travel_paper_deduction" class="block text-xs font-semibold text-slate-400 mb-1">Travel Paper / Permit (₱)</label>
-                        <input type="number" step="0.01" min="0" name="travel_paper_deduction" id="travel_paper_deduction" value="{{ old('travel_paper_deduction', '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="number" step="0.01" min="0" name="travel_paper_deduction" id="travel_paper_deduction" form="scaleForm" value="{{ old('travel_paper_deduction', '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
 
                     <!-- Trucking Deduction -->
                     <div>
                         <label for="trucking_deduction" class="block text-xs font-semibold text-slate-400 mb-1">Trucking Deduction (₱)</label>
-                        <input type="number" step="0.01" min="0" name="trucking_deduction" id="trucking_deduction" value="{{ old('trucking_deduction', '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="number" step="0.01" min="0" name="trucking_deduction" id="trucking_deduction" form="scaleForm" value="{{ old('trucking_deduction', '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
 
                     <!-- Cash Advance -->
                     <div>
                         <label for="cash_advance" class="block text-xs font-semibold text-slate-400 mb-1">Cash Advance (₱)</label>
-                        <input type="number" step="0.01" min="0" name="cash_advance" id="cash_advance" value="{{ old('cash_advance', '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="number" step="0.01" min="0" name="cash_advance" id="cash_advance" form="scaleForm" value="{{ old('cash_advance', '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
 
                     <!-- Other Deduction -->
                     <div>
                         <label for="other_deduction_label" class="block text-xs font-semibold text-slate-400 mb-1">Other Deduction Label</label>
-                        <input type="text" name="other_deduction_label" id="other_deduction_label" value="{{ old('other_deduction_label', '') }}" placeholder="e.g. Fuel / Inspection" class="w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="text" name="other_deduction_label" id="other_deduction_label" form="scaleForm" value="{{ old('other_deduction_label', '') }}" placeholder="e.g. Fuel / Inspection" class="w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
                     <div>
                         <label for="other_deduction_amount" class="block text-xs font-semibold text-slate-400 mb-1">Other Deduction Amount (₱)</label>
-                        <input type="number" step="0.01" min="0" name="other_deduction_amount" id="other_deduction_amount" value="{{ old('other_deduction_amount', '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="number" step="0.01" min="0" name="other_deduction_amount" id="other_deduction_amount" form="scaleForm" value="{{ old('other_deduction_amount', '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
                 </div>
 
@@ -471,6 +471,7 @@
             const defaultDiaB = data.diameterB || data.diameter || 20;
 
             tr.innerHTML = `
+                <td hidden>
                 <!-- Part A hidden inputs -->
                 <input type="hidden" name="items[${rowIndex}_A][is_split]" value="1">
                 <input type="hidden" name="items[${rowIndex}_A][split_group_id]" value="split_${rowIndex}">
@@ -498,6 +499,7 @@
                 <input type="hidden" name="items[${rowIndex}_B][volume]" class="row-volume-hidden-b" value="0.000">
                 <input type="hidden" name="items[${rowIndex}_B][total_volume]" class="row-total-volume-hidden-b" value="0.000">
                 <input type="hidden" name="items[${rowIndex}_B][subtotal]" class="row-subtotal-hidden-b" value="0.00">
+                </td>
 
                 <td class="px-3 py-3 text-center text-xs text-slate-500 font-mono row-num">1</td>
                 
@@ -570,6 +572,7 @@
             `;
 
             document.getElementById('splitMatrixBody').appendChild(tr);
+            tr.querySelectorAll('[name]').forEach(control => control.setAttribute('form', 'scaleForm'));
 
             const syncInputs = () => {
                 const cat = tr.querySelector('.row-cat-select').value;
@@ -685,9 +688,11 @@
             const defaultLen = data.length || '2.6';
 
             tr.innerHTML = `
+                <td hidden>
                 <input type="hidden" name="items[${rowIndex}][volume]" class="row-vol-hidden" value="0.000">
                 <input type="hidden" name="items[${rowIndex}][total_volume]" class="row-total-vol-hidden" value="0.000">
                 <input type="hidden" name="items[${rowIndex}][subtotal]" class="row-subtotal-hidden" value="0.00">
+                </td>
                 <td class="px-3 py-3 text-center text-xs text-slate-500 font-mono row-num">1</td>
                 
                 <td class="px-3 py-3">
@@ -736,6 +741,7 @@
             `;
 
             document.getElementById('standardMatrixBody').appendChild(tr);
+            tr.querySelectorAll('[name]').forEach(control => control.setAttribute('form', 'scaleForm'));
 
             ['row-cat', 'row-grade', 'row-len', 'row-dia', 'row-qty'].forEach(cls => {
                 tr.querySelector(`.${cls}`).addEventListener('change', recalculateAll);

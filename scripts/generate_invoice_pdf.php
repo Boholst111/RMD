@@ -74,7 +74,8 @@ $calculatedDeductions = round(
     (float) $truckLoad->expenses_deduction
     + (float) $truckLoad->travel_paper_deduction
     + (float) $truckLoad->trucking_deduction
-    + (float) $truckLoad->cash_advance,
+    + (float) $truckLoad->cash_advance
+    + (float) $truckLoad->other_deduction_amount,
     2
 );
 $calculatedNetPayable = round($calculatedGrossAmount - $calculatedDeductions + (float) $truckLoad->drivers_assistance, 2);

@@ -507,48 +507,76 @@ class ScalingController extends Controller
             'travel_paper_deduction' => 'nullable|numeric|min:0',
             'trucking_deduction' => 'nullable|numeric|min:0',
             'cash_advance' => 'nullable|numeric|min:0',
-            'other_deduction_label' => 'nullable|string|max:255',
+            'other_deduction_label' => 'nullable|string|max:150',
             'other_deduction_amount' => 'nullable|numeric|min:0',
             'notes' => 'nullable|string',
             'date_scaled' => 'nullable|date',
             'date_unload' => 'nullable|date',
+            'items' => 'sometimes|array',
+            'items.*.category' => 'required|string|max:120',
+            'items.*.grade' => 'required|string|in:Good,Sawmill',
+            'items.*.length' => 'required|numeric|min:0.1',
+            'items.*.diameter' => 'required|integer|min:1',
+            'items.*.quantity' => 'required|integer|min:0',
+            'items.*.is_split' => 'sometimes|boolean',
+            'items.*.split_group_id' => 'nullable|string|max:100',
+            'items.*.parent_log_id' => 'nullable|integer',
+            'items.*.split_side' => 'nullable|string|in:A,B',
+            'items.*.volume' => 'nullable|numeric|min:0',
+            'items.*.total_volume' => 'nullable|numeric|min:0',
+            'items.*.subtotal' => 'nullable|numeric|min:0',
         ]);
 
-        $driversAssistance = (float) ($request->input('drivers_assistance', $validated['drivers_assistance'] ?? 0));
-        $expensesDeduction = (float) ($request->input('expenses_deduction', $validated['expenses_deduction'] ?? 0));
-        $travelPaper = (float) ($request->input('travel_paper_deduction', $validated['travel_paper_deduction'] ?? 0));
-        $truckingDeduction = (float) ($request->input('trucking_deduction', $validated['trucking_deduction'] ?? 0));
-        $cashAdvance = (float) ($request->input('cash_advance', $validated['cash_advance'] ?? 0));
-        $otherDeductionLabel = $request->input('other_deduction_label', $validated['other_deduction_label'] ?? null);
-        $otherDeductionAmount = (float) ($request->input('other_deduction_amount', $validated['other_deduction_amount'] ?? 0));
+        $driversAssistance = (float) ($validated['drivers_assistance'] ?? 0);
+        $expensesDeduction = (float) ($validated['expenses_deduction'] ?? 0);
+        $travelPaper = (float) ($validated['travel_paper_deduction'] ?? 0);
+        $truckingDeduction = (float) ($validated['trucking_deduction'] ?? 0);
+        $cashAdvance = (float) ($validated['cash_advance'] ?? 0);
+        $otherDeductionLabel = $validated['other_deduction_label'] ?? null;
+        $otherDeductionAmount = (float) ($validated['other_deduction_amount'] ?? 0);
 
         $totalDeductions = $expensesDeduction + $travelPaper + $truckingDeduction + $cashAdvance + $otherDeductionAmount;
         $netPayable = (float) $sheet->gross_amount - $totalDeductions + $driversAssistance;
 
-        $sheet->update([
-            'drivers_assistance' => $driversAssistance,
-            'expenses_deduction' => $expensesDeduction,
-            'travel_paper_deduction' => $travelPaper,
-            'trucking_deduction' => $truckingDeduction,
-            'cash_advance' => $cashAdvance,
-            'other_deduction_label' => $otherDeductionLabel ?: null,
-            'other_deduction_amount' => $otherDeductionAmount,
-            'total_deductions' => round($totalDeductions, 2),
-            'net_payable' => round($netPayable, 2),
-            'notes' => $request->input('notes', $sheet->notes),
-            'date_scaled' => $request->input('date_scaled', $sheet->date_scaled),
-            'date_unload' => $request->input('date_unload', $sheet->date_unload),
-        ]);
+        $submittedItems = collect($validated['items'] ?? [])
+            ->filter(fn ($item) => (int) $item['quantity'] > 0)
+            ->values()
+            ->all();
 
-        // If items[] were submitted, sync scaleItems by deleting existing and recreating
-        $submittedItems = collect($request->input('items', []))
-            ->filter(function ($item) {
-                return isset($item['quantity']) && (int) $item['quantity'] > 0;
-            })->values()->all();
+        try {
+            DB::transaction(function () use (
+                $sheet,
+                $request,
+                $driversAssistance,
+                $expensesDeduction,
+                $travelPaper,
+                $truckingDeduction,
+                $cashAdvance,
+                $otherDeductionLabel,
+                $otherDeductionAmount,
+                $totalDeductions,
+                $netPayable,
+                $submittedItems
+            ) {
+                $sheet->update([
+                    'drivers_assistance' => $driversAssistance,
+                    'expenses_deduction' => $expensesDeduction,
+                    'travel_paper_deduction' => $travelPaper,
+                    'trucking_deduction' => $truckingDeduction,
+                    'cash_advance' => $cashAdvance,
+                    'other_deduction_label' => $otherDeductionLabel ?: null,
+                    'other_deduction_amount' => $otherDeductionAmount,
+                    'total_deductions' => round($totalDeductions, 2),
+                    'net_payable' => round($netPayable, 2),
+                    'notes' => $request->input('notes', $sheet->notes),
+                    'date_scaled' => $request->input('date_scaled', $sheet->date_scaled),
+                    'date_unload' => $request->input('date_unload', $sheet->date_unload),
+                ]);
 
-        if (!empty($submittedItems)) {
-            DB::beginTransaction();
-            try {
+                if (empty($submittedItems)) {
+                    return;
+                }
+
                 // remove existing items for this sheet
                 ScaleItem::where('truck_load_id', $sheet->id)->delete();
 
@@ -658,13 +686,10 @@ class ScalingController extends Controller
                     'total_deductions' => round($totalDeductions, 2),
                     'net_payable' => round($netPayable, 2),
                 ]);
-
-                DB::commit();
-            } catch (	hrowable $e) {
-                DB::rollBack();
-                Log::error('Scaling update failed while syncing items', ['error' => $e->getMessage(), 'truck_load_id' => $sheet->id]);
-                return redirect()->back()->withInput()->with('error', 'Error updating scale items: ' . $e->getMessage());
-            }
+            });
+        } catch (\Throwable $e) {
+            Log::error('Scaling update failed', ['error' => $e->getMessage(), 'truck_load_id' => $sheet->id]);
+            return redirect()->back()->withInput()->with('error', 'Error updating scale sheet: ' . $e->getMessage());
         }
 
         return redirect()->route('scaling.show', ['scaling' => $sheet->id])

@@ -232,41 +232,41 @@
                     <!-- Driver's Assistance -->
                     <div>
                         <label for="drivers_assistance" class="block text-xs font-semibold text-slate-400 mb-1">Driver's Assistance (₱)</label>
-                        <input type="number" step="0.01" min="0" name="drivers_assistance" id="drivers_assistance" value="{{ old('drivers_assistance', $sheet->drivers_assistance ?? '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="number" step="0.01" min="0" name="drivers_assistance" id="drivers_assistance" form="scaleForm" value="{{ old('drivers_assistance', $sheet->drivers_assistance ?? '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
 
                     <!-- Expenses Deduction -->
                     <div>
                         <label for="expenses_deduction" class="block text-xs font-semibold text-slate-400 mb-1">Expenses Deduction (₱)</label>
-                        <input type="number" step="0.01" min="0" name="expenses_deduction" id="expenses_deduction" value="{{ old('expenses_deduction', $sheet->expenses_deduction ?? '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="number" step="0.01" min="0" name="expenses_deduction" id="expenses_deduction" form="scaleForm" value="{{ old('expenses_deduction', $sheet->expenses_deduction ?? '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
 
                     <!-- Travel Paper Deduction -->
                     <div>
                         <label for="travel_paper_deduction" class="block text-xs font-semibold text-slate-400 mb-1">Travel Paper / Permit (₱)</label>
-                        <input type="number" step="0.01" min="0" name="travel_paper_deduction" id="travel_paper_deduction" value="{{ old('travel_paper_deduction', $sheet->travel_paper_deduction ?? '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="number" step="0.01" min="0" name="travel_paper_deduction" id="travel_paper_deduction" form="scaleForm" value="{{ old('travel_paper_deduction', $sheet->travel_paper_deduction ?? '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
 
                     <!-- Trucking Deduction -->
                     <div>
                         <label for="trucking_deduction" class="block text-xs font-semibold text-slate-400 mb-1">Trucking Deduction (₱)</label>
-                        <input type="number" step="0.01" min="0" name="trucking_deduction" id="trucking_deduction" value="{{ old('trucking_deduction', $sheet->trucking_deduction ?? '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="number" step="0.01" min="0" name="trucking_deduction" id="trucking_deduction" form="scaleForm" value="{{ old('trucking_deduction', $sheet->trucking_deduction ?? '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
 
                     <!-- Cash Advance -->
                     <div>
                         <label for="cash_advance" class="block text-xs font-semibold text-slate-400 mb-1">Cash Advance (₱)</label>
-                        <input type="number" step="0.01" min="0" name="cash_advance" id="cash_advance" value="{{ old('cash_advance', $sheet->cash_advance ?? '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="number" step="0.01" min="0" name="cash_advance" id="cash_advance" form="scaleForm" value="{{ old('cash_advance', $sheet->cash_advance ?? '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
 
                     <!-- Other Deduction -->
                     <div>
                         <label for="other_deduction_label" class="block text-xs font-semibold text-slate-400 mb-1">Other Deduction Label</label>
-                        <input type="text" name="other_deduction_label" id="other_deduction_label" value="{{ old('other_deduction_label', $sheet->other_deduction_label ?? '') }}" placeholder="e.g. Fuel / Inspection" class="w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="text" name="other_deduction_label" id="other_deduction_label" form="scaleForm" value="{{ old('other_deduction_label', $sheet->other_deduction_label ?? '') }}" placeholder="e.g. Fuel / Inspection" class="w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
                     <div>
                         <label for="other_deduction_amount" class="block text-xs font-semibold text-slate-400 mb-1">Other Deduction Amount (₱)</label>
-                        <input type="number" step="0.01" min="0" name="other_deduction_amount" id="other_deduction_amount" value="{{ old('other_deduction_amount', $sheet->other_deduction_amount ?? '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
+                        <input type="number" step="0.01" min="0" name="other_deduction_amount" id="other_deduction_amount" form="scaleForm" value="{{ old('other_deduction_amount', $sheet->other_deduction_amount ?? '0.00') }}" class="deduction-input w-full bg-slate-900 border border-slate-700 text-slate-100 font-mono text-sm rounded-xl px-4 py-2 focus:ring-2 focus:ring-amber-500 outline-none">
                     </div>
                 </div>
 

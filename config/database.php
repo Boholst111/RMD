@@ -5,8 +5,14 @@ use Illuminate\Support\Str;
 $dbUrl = env('MYSQL_URL') ?: env('DATABASE_URL') ?: env('DB_URL');
 $dbUrlParsed = $dbUrl ? parse_url($dbUrl) : [];
 
+$isRailwayRuntime = ! empty(env('RAILWAY_ENVIRONMENT')) || getenv('RAILWAY_ENVIRONMENT') !== false || getenv('RAILWAY_PROJECT_ID') !== false;
 $mysqlUrl = $dbUrl;
 $mysqlHost = $dbUrlParsed['host'] ?? env('DB_HOST', env('MYSQL_HOST', env('MYSQLHOST', env('RAILWAY_MYSQL_HOST', '127.0.0.1'))));
+
+if (! $isRailwayRuntime && is_string($mysqlHost) && str_contains($mysqlHost, 'railway.internal')) {
+    $mysqlHost = '127.0.0.1';
+}
+
 $mysqlPort = $dbUrlParsed['port'] ?? env('DB_PORT', env('MYSQL_PORT', env('MYSQLPORT', env('RAILWAY_MYSQL_PORT', '3306'))));
 $mysqlDatabase = isset($dbUrlParsed['path']) ? ltrim($dbUrlParsed['path'], '/') : env('DB_DATABASE', env('MYSQL_DATABASE', env('MYSQLDATABASE', env('RAILWAY_MYSQL_DATABASE', 'laravel'))));
 $mysqlUsername = $dbUrlParsed['user'] ?? env('DB_USERNAME', env('MYSQL_USER', env('MYSQLUSER', env('RAILWAY_MYSQL_USER', 'root'))));

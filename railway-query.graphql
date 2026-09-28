@@ -1,1 +1,0 @@
-{ project(id:"3249f016-8f7a-4dea-8fbb-031a44d8ac9e") { environments { edges { node { name serviceInstances { edges { node { serviceName upstreamUrl domains { serviceDomains { domain } customDomains { id } } } } } } } } } }
