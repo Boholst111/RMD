@@ -17,7 +17,7 @@ COPY . .
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist \
     && npm ci \
     && npm run build
-RUN cp .env.example .env && php artisan key:generate --force && php artisan storage:link --force
+RUN cp .env.example .env && php artisan key:generate --force && php artisan storage:link --force && rm -f .env
 RUN chmod +x ./scripts/start.sh
 
 EXPOSE 8080

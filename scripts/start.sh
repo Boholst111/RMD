@@ -2,6 +2,7 @@
 set -e
 
 echo "Starting Laravel runtime..."
+php artisan migrate --force
 php artisan config:clear
 php artisan config:cache
 php artisan event:cache
