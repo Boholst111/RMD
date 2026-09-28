@@ -322,10 +322,7 @@ class ScalingController extends Controller
             $otherDeductionLabel = trim($validated['other_deduction_label'] ?? '');
             $otherDeductionAmount = (float) ($validated['other_deduction_amount'] ?? 0);
 
-            // Invoice number generation
             $currentYear = date('Y', strtotime($validated['date_scaled']));
-            $lastId = TruckLoad::whereYear('created_at', $currentYear)->max('id') ?? 0;
-            $invoiceNo = sprintf('RMD-%s-%04d', $currentYear, $lastId + 1);
 
             // Reserve atomic scale_sheet_no
             $sheetNo = null;
@@ -337,6 +334,17 @@ class ScalingController extends Controller
             $next = $row->last_value + 1;
             FacadesDB::table('scale_sheet_counters')->where('id', $row->id)->update(['last_value' => $next, 'updated_at' => now()]);
             $sheetNo = (string) $next;
+
+            // The locked counter serializes creates; derive invoice sequence from invoice numbers, not timestamps.
+            $invoicePrefix = "RMD-{$currentYear}-";
+            $lastInvoiceSequence = TruckLoad::where('invoice_no', 'like', $invoicePrefix . '%')
+                ->pluck('invoice_no')
+                ->reduce(function (int $highest, string $invoiceNumber) use ($invoicePrefix): int {
+                    $sequence = substr($invoiceNumber, strlen($invoicePrefix));
+
+                    return ctype_digit($sequence) ? max($highest, (int) $sequence) : $highest;
+                }, 0);
+            $invoiceNo = sprintf('RMD-%s-%04d', $currentYear, $lastInvoiceSequence + 1);
 
             // Create TruckLoad record
             $truckLoad = TruckLoad::create([
@@ -476,7 +484,7 @@ class ScalingController extends Controller
             }
 
             Log::error('Scaling store failed', ['error' => $e->getMessage()]);
-            return redirect()->back()->withInput()->with('error', 'Error saving scale sheet: ' . $e->getMessage());
+            return redirect()->back()->withInput()->with('error', 'Unable to save the scale sheet. Please try again or contact support.');
         }
     }
 
@@ -689,7 +697,7 @@ class ScalingController extends Controller
             });
         } catch (\Throwable $e) {
             Log::error('Scaling update failed', ['error' => $e->getMessage(), 'truck_load_id' => $sheet->id]);
-            return redirect()->back()->withInput()->with('error', 'Error updating scale sheet: ' . $e->getMessage());
+            return redirect()->back()->withInput()->with('error', 'Unable to update the scale sheet. Please try again or contact support.');
         }
 
         return redirect()->route('scaling.show', ['scaling' => $sheet->id])

@@ -207,6 +207,57 @@ class ScalingDeductionInvoiceTest extends TestCase
         $this->assertSame(3494.0, (float) $truckLoad->net_payable);
     }
 
+    public function test_invoice_sequence_uses_existing_invoice_numbers_not_created_at(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+        $supplier = Supplier::create(['name' => 'Imported Invoice Supplier']);
+        $invoiceYear = now()->format('Y');
+        $existingLoad = TruckLoad::create([
+            'supplier_id' => $supplier->id,
+            'truck_plate_no' => 'OLD-0001',
+            'scale_sheet_no' => '89001',
+            'invoice_no' => "RMD-{$invoiceYear}-0001",
+            'status' => 'completed',
+            'date_unload' => now()->toDateString(),
+            'date_scaled' => now()->toDateString(),
+        ]);
+        DB::table('truck_loads')->where('id', $existingLoad->id)->update([
+            'created_at' => now()->subYear(),
+        ]);
+
+        $response = $this->actingAs($user)->post(route('scaling.store'), [
+            'supplier_name' => $supplier->name,
+            'truck_plate_no' => 'NEW-0002',
+            'date_unload' => now()->toDateString(),
+            'date_scaled' => now()->toDateString(),
+            'drivers_assistance' => '0.00',
+            'expenses_deduction' => '0.00',
+            'travel_paper_deduction' => '0.00',
+            'trucking_deduction' => '0.00',
+            'cash_advance' => '0.00',
+            'other_deduction_label' => '',
+            'other_deduction_amount' => '0.00',
+            'items' => [[
+                'category' => 'FALCATA',
+                'grade' => 'Good',
+                'length' => '2.6',
+                'diameter' => '20',
+                'quantity' => '1',
+                'volume' => '0.081',
+                'total_volume' => '0.081',
+                'subtotal' => '10.00',
+            ]],
+        ]);
+
+        $newLoad = TruckLoad::where('truck_plate_no', 'NEW-0002')->firstOrFail();
+
+        $response->assertRedirect(route('scaling.invoice.print', $newLoad->id));
+        $this->assertSame("RMD-{$invoiceYear}-0002", $newLoad->invoice_no);
+    }
+
     public function test_edit_rolls_back_deductions_when_scale_item_sync_fails(): void
     {
         $user = User::factory()->create([
@@ -244,7 +295,7 @@ class ScalingDeductionInvoiceTest extends TestCase
 
         DB::statement("CREATE TRIGGER fail_scale_item_insert BEFORE INSERT ON scale_items BEGIN SELECT RAISE(ABORT, 'forced test failure'); END");
 
-        $this->actingAs($user)->put(route('scaling.update', ['scaling' => $truckLoad->id]), [
+        $response = $this->actingAs($user)->put(route('scaling.update', ['scaling' => $truckLoad->id]), [
             'drivers_assistance' => '1000.00',
             'expenses_deduction' => '0.00',
             'travel_paper_deduction' => '500.00',
@@ -263,6 +314,7 @@ class ScalingDeductionInvoiceTest extends TestCase
                 'subtotal' => '500.00',
             ]],
         ]);
+        $response->assertSessionHas('error', 'Unable to update the scale sheet. Please try again or contact support.');
 
         $truckLoad->refresh();
 
