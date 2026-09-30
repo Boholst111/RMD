@@ -11,4 +11,10 @@ if (! $headers) {
     echo "NO_RESPONSE for {$url}\n";
     exit(1);
 }
-print_r($headers);
+$status = is_array($headers[0] ?? null) ? end($headers[0]) : ($headers[0] ?? 'Unknown status');
+$contentType = $headers['Content-Type'] ?? 'Unknown content type';
+if (is_array($contentType)) {
+    $contentType = end($contentType);
+}
+
+echo "HTTP {$status}\nContent-Type: {$contentType}\n";

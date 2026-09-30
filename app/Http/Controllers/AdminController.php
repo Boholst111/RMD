@@ -60,11 +60,11 @@ class AdminController extends Controller
      */
     public function storeCategory(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|unique:categories,name|max:255',
         ]);
 
-        Category::create(['name' => $request->name]);
+        DB::transaction(fn () => Category::create(['name' => $validated['name']]));
 
         // Invalidate cached categories and price matrix
         Cache::forget('active_price_categories');
@@ -83,10 +83,11 @@ class AdminController extends Controller
         ]);
 
         $oldName = $category->name;
-        $category->update(['name' => $request->name]);
+        DB::transaction(function () use ($category, $oldName, $request) {
+            $category->update(['name' => $request->name]);
 
-        // Update related price matrix entries to use new category name
-        PriceMatrix::where('category', $oldName)->update(['category' => $request->name]);
+            PriceMatrix::where('category', $oldName)->update(['category' => $request->name]);
+        });
 
         Cache::forget('active_price_categories');
         Cache::forget('active_price_matrix');
@@ -104,18 +105,20 @@ class AdminController extends Controller
             return back()->with('error', 'Category cannot be deleted because there are ' . $count . ' price matrix rows referencing it. Please delete or reassign those rows first.');
         }
 
-        $category->delete();
+        DB::transaction(function () use ($category, $request) {
+            $category->delete();
+
+            AuditLog::create([
+                'user_id' => Auth::id(),
+                'user_name' => Auth::user()->name,
+                'action' => 'Category Deleted',
+                'details' => "Deleted category {$category->name}",
+                'ip_address' => $request->ip(),
+            ]);
+        });
 
         Cache::forget('active_price_categories');
         Cache::forget('active_price_matrix');
-
-        AuditLog::create([
-            'user_id' => Auth::id(),
-            'user_name' => Auth::user()->name,
-            'action' => 'Category Deleted',
-            'details' => "Deleted category {$category->name}",
-            'ip_address' => $request->ip(),
-        ]);
 
         return back()->with('success', 'Category deleted successfully.');
     }
@@ -145,15 +148,6 @@ class AdminController extends Controller
 
         $rate = PricingService::getRate($category, $length, $diameter, $grade);
         
-        // Log the lookup for debugging duplicate price issues
-        \Illuminate\Support\Facades\Log::debug('API Rate Lookup', [
-            'category' => $category,
-            'length' => $length,
-            'diameter' => $diameter,
-            'grade' => $grade,
-            'rate_returned' => $rate
-        ]);
-
         return response()->json([
             'rate' => $rate,
             'category' => $category,
@@ -189,10 +183,10 @@ class AdminController extends Controller
         $validated = $request->validate([
             'prices' => 'required|array',
             'prices.*.id' => 'required|exists:price_matrices,id',
-            'prices.*.price' => 'required|numeric|min:0',
+            'prices.*.price' => 'required|numeric|min:0|max:999999999999.99',
         ]);
 
-        DB::transaction(function () use ($validated) {
+        DB::transaction(function () use ($validated, $request) {
             foreach ($validated['prices'] as $item) {
                 $pm = PriceMatrix::find($item['id']);
                 if (! $pm) {
@@ -210,18 +204,18 @@ class AdminController extends Controller
                     $matchingRow->save();
                 }
             }
+
+            AuditLog::create([
+                'user_id' => Auth::id(),
+                'user_name' => Auth::user()->name,
+                'action' => 'Price Matrix Updated',
+                'details' => 'Super Admin updated global wood pricing rates.',
+                'ip_address' => $request->ip(),
+            ]);
         });
 
         // STRICT: Clear ALL pricing caches immediately - no stale rates for scalers
         PricingService::clearPricingCache();
-        
-        AuditLog::create([
-            'user_id' => Auth::id(),
-            'user_name' => Auth::user()->name,
-            'action' => 'Price Matrix Updated',
-            'details' => 'Super Admin updated global wood pricing rates. Cache cleared immediately for real-time sync.',
-            'ip_address' => $request->ip(),
-        ]);
 
         return redirect()->route('admin.dashboard')->with('success', 'Dynamic Price Matrix updated successfully! Scalers will see new rates immediately.');
     }
@@ -237,33 +231,34 @@ class AdminController extends Controller
             'length' => 'required|numeric|min:0.01',
             'dia_min' => 'required|integer|min:0',
             'dia_max' => 'required|integer|min:0|gte:dia_min',
-            'price_per_cu_m' => 'required|numeric|min:0',
+            'price_per_cu_m' => 'required|numeric|min:0|max:999999999999.99',
         ]);
 
-        PriceMatrix::create([
-            'category' => strtoupper(trim($validated['category'])),
-            'length' => $validated['length'],
-            'dia_min' => $validated['dia_min'],
-            'dia_max' => $validated['dia_max'],
-            'price_per_cu_m' => $validated['price_per_cu_m'],
-        ]);
+        DB::transaction(function () use ($validated, $request) {
+            PriceMatrix::create([
+                'category' => strtoupper(trim($validated['category'])),
+                'length' => $validated['length'],
+                'dia_min' => $validated['dia_min'],
+                'dia_max' => $validated['dia_max'],
+                'price_per_cu_m' => $validated['price_per_cu_m'],
+            ]);
 
-        // STRICT: Clear ALL caches immediately
+            AuditLog::create([
+                'user_id' => Auth::id(),
+                'user_name' => Auth::user()->name,
+                'action' => 'Price Matrix Row Added',
+                'details' => sprintf('Super Admin added new category rate: %s %.3fm, %d-%d cm, ₱%.3f.',
+                    strtoupper(trim($validated['category'])),
+                    $validated['length'],
+                    $validated['dia_min'],
+                    $validated['dia_max'],
+                    $validated['price_per_cu_m']
+                ),
+                'ip_address' => $request->ip(),
+            ]);
+        });
+
         PricingService::clearPricingCache();
-        
-        AuditLog::create([
-            'user_id' => Auth::id(),
-            'user_name' => Auth::user()->name,
-            'action' => 'Price Matrix Row Added',
-            'details' => sprintf('Super Admin added new category rate: %s %.3fm, %d-%d cm, ₱%.3f. Cache cleared immediately for real-time sync.',
-                strtoupper(trim($validated['category'])),
-                $validated['length'],
-                $validated['dia_min'],
-                $validated['dia_max'],
-                $validated['price_per_cu_m']
-            ),
-            'ip_address' => $request->ip(),
-        ]);
 
         return redirect()->route('admin.dashboard')->with('success', 'New price matrix row added! Scalers will see it immediately.');
     }
@@ -279,18 +274,19 @@ class AdminController extends Controller
                 $priceMatrix->price_per_cu_m
             );
 
-            $priceMatrix->delete();
+            DB::transaction(function () use ($priceMatrix, $details, $request) {
+                $priceMatrix->delete();
 
-            // STRICT: Clear ALL caches immediately
+                AuditLog::create([
+                    'user_id' => Auth::id(),
+                    'user_name' => Auth::user()->name,
+                    'action' => 'Price Matrix Row Deleted',
+                    'details' => $details,
+                    'ip_address' => $request->ip(),
+                ]);
+            });
+
             PricingService::clearPricingCache();
-            
-            AuditLog::create([
-                'user_id' => Auth::id(),
-                'user_name' => Auth::user()->name,
-                'action' => 'Price Matrix Row Deleted',
-                'details' => $details,
-                'ip_address' => $request->ip(),
-            ]);
         }
 
         return redirect()->route('admin.dashboard')->with('success', 'Price matrix row deleted successfully. Scalers will see changes immediately.');
@@ -304,37 +300,43 @@ class AdminController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:150|unique:suppliers,name',
             'contact_no' => 'nullable|string|max:50',
-            'address' => 'nullable|string|max:500',
+            'address' => 'nullable|string|max:255',
         ]);
 
-        $supplier = Supplier::create([
-            'name' => trim($validated['name']),
-            'contact_no' => $validated['contact_no'],
-            'address' => $validated['address'],
-        ]);
+        $supplier = DB::transaction(function () use ($validated, $request) {
+            $supplier = Supplier::create([
+                'name' => trim($validated['name']),
+                'contact_no' => $validated['contact_no'] ?? null,
+                'address' => $validated['address'] ?? null,
+            ]);
 
-        AuditLog::create([
-            'user_id' => Auth::id(),
-            'user_name' => Auth::user()->name,
-            'action' => 'Supplier Added',
-            'details' => "Super Admin added supplier {$supplier->name}.",
-            'ip_address' => $request->ip(),
-        ]);
+            AuditLog::create([
+                'user_id' => Auth::id(),
+                'user_name' => Auth::user()->name,
+                'action' => 'Supplier Added',
+                'details' => "Super Admin added supplier {$supplier->name}.",
+                'ip_address' => $request->ip(),
+            ]);
+
+            return $supplier;
+        });
 
         return back()->with('success', 'Supplier created successfully!');
     }
 
     public function destroySupplier(Request $request, Supplier $supplier)
     {
-        $supplier->delete();
+        DB::transaction(function () use ($supplier, $request) {
+            $supplier->delete();
 
-        AuditLog::create([
-            'user_id' => Auth::id(),
-            'user_name' => Auth::user()->name,
-            'action' => 'Supplier Deleted',
-            'details' => "Super Admin deleted supplier {$supplier->name}.",
-            'ip_address' => $request->ip(),
-        ]);
+            AuditLog::create([
+                'user_id' => Auth::id(),
+                'user_name' => Auth::user()->name,
+                'action' => 'Supplier Deleted',
+                'details' => "Super Admin deleted supplier {$supplier->name}.",
+                'ip_address' => $request->ip(),
+            ]);
+        });
 
         return back()->with('success', 'Supplier deleted successfully.');
     }
@@ -351,21 +353,25 @@ class AdminController extends Controller
             'role' => 'required|in:admin,super_admin',
         ]);
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => strtolower(trim($validated['email'])),
-            'password' => Hash::make($validated['password']),
-            'role' => $validated['role'],
-            'status' => 'active',
-        ]);
+        $user = DB::transaction(function () use ($validated, $request) {
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => strtolower(trim($validated['email'])),
+                'password' => Hash::make($validated['password']),
+                'role' => $validated['role'],
+                'status' => 'active',
+            ]);
 
-        AuditLog::create([
-            'user_id' => Auth::id(),
-            'user_name' => Auth::user()->name,
-            'action' => 'User Created',
-            'details' => "Created new account {$user->name} ({$user->email}) with role {$user->role}.",
-            'ip_address' => $request->ip(),
-        ]);
+            AuditLog::create([
+                'user_id' => Auth::id(),
+                'user_name' => Auth::user()->name,
+                'action' => 'User Created',
+                'details' => "Created new account {$user->name} ({$user->email}) with role {$user->role}.",
+                'ip_address' => $request->ip(),
+            ]);
+
+            return $user;
+        });
 
         return back()->with('success', "Staff account {$user->name} created successfully!");
     }
@@ -379,16 +385,18 @@ class AdminController extends Controller
             return back()->with('error', 'You cannot suspend your own account!');
         }
 
-        $user->status = $user->status === 'active' ? 'suspended' : 'active';
-        $user->save();
+        DB::transaction(function () use ($user, $request) {
+            $user->status = $user->status === 'active' ? 'suspended' : 'active';
+            $user->save();
 
-        AuditLog::create([
-            'user_id' => Auth::id(),
-            'user_name' => Auth::user()->name,
-            'action' => 'User Status Changed',
-            'details' => "Changed status of {$user->name} to {$user->status}.",
-            'ip_address' => $request->ip(),
-        ]);
+            AuditLog::create([
+                'user_id' => Auth::id(),
+                'user_name' => Auth::user()->name,
+                'action' => 'User Status Changed',
+                'details' => "Changed status of {$user->name} to {$user->status}.",
+                'ip_address' => $request->ip(),
+            ]);
+        });
 
         return back()->with('success', "Account status for {$user->name} updated to {$user->status}.");
     }
@@ -398,16 +406,18 @@ class AdminController extends Controller
      */
     public function unlockScaleSheet(Request $request, TruckLoad $truckLoad)
     {
-        $truckLoad->status = 'draft';
-        $truckLoad->save();
+        DB::transaction(function () use ($request, $truckLoad) {
+            $truckLoad->status = 'draft';
+            $truckLoad->save();
 
-        AuditLog::create([
-            'user_id' => Auth::id(),
-            'user_name' => Auth::user()->name,
-            'action' => 'Record Unlocked',
-            'details' => "Super Admin unlocked Scale Sheet #{$truckLoad->scale_sheet_no} (Invoice #{$truckLoad->invoice_no}) for editing.",
-            'ip_address' => $request->ip(),
-        ]);
+            AuditLog::create([
+                'user_id' => Auth::id(),
+                'user_name' => Auth::user()->name,
+                'action' => 'Record Unlocked',
+                'details' => "Super Admin unlocked Scale Sheet #{$truckLoad->scale_sheet_no} (Invoice #{$truckLoad->invoice_no}) for editing.",
+                'ip_address' => $request->ip(),
+            ]);
+        });
 
         return back()->with('success', "Scale Sheet #{$truckLoad->scale_sheet_no} unlocked! Staff can now edit this record.");
     }
@@ -420,17 +430,19 @@ class AdminController extends Controller
         $sheetNo = $truckLoad->scale_sheet_no;
         $invoiceNo = $truckLoad->invoice_no;
 
-        $truckLoad->delete();
+        DB::transaction(function () use ($request, $truckLoad, $sheetNo, $invoiceNo) {
+            $truckLoad->delete();
 
-        AuditLog::create([
-            'user_id' => Auth::id(),
-            'user_name' => Auth::user()->name,
-            'action' => 'Record Deleted',
-            'details' => "Super Admin permanently deleted Scale Sheet #{$sheetNo} (Invoice #{$invoiceNo}).",
-            'ip_address' => $request->ip(),
-        ]);
+            AuditLog::create([
+                'user_id' => Auth::id(),
+                'user_name' => Auth::user()->name,
+                'action' => 'Record Archived',
+                'details' => "Super Admin archived Scale Sheet #{$sheetNo} (Invoice #{$invoiceNo}).",
+                'ip_address' => $request->ip(),
+            ]);
+        });
 
-        return back()->with('success', "Scale Sheet #{$sheetNo} deleted permanently by Super Admin override.");
+        return back()->with('success', "Scale Sheet #{$sheetNo} archived by Super Admin.");
     }
 
     /**
@@ -442,21 +454,23 @@ class AdminController extends Controller
             'status' => 'required|in:draft,completed',
         ]);
 
-        $oldStatus = $truckLoad->status;
-        $truckLoad->status = $validated['status'];
-        $truckLoad->save();
+        DB::transaction(function () use ($request, $truckLoad, $validated) {
+            $oldStatus = $truckLoad->status;
+            $truckLoad->status = $validated['status'];
+            $truckLoad->save();
 
-        AuditLog::create([
-            'user_id' => Auth::id(),
-            'user_name' => Auth::user()->name,
-            'action' => 'Scale Sheet Status Changed',
-            'details' => sprintf('Super Admin changed Scale Sheet #%s status from %s to %s.',
-                $truckLoad->scale_sheet_no,
-                strtoupper($oldStatus),
-                strtoupper($truckLoad->status)
-            ),
-            'ip_address' => $request->ip(),
-        ]);
+            AuditLog::create([
+                'user_id' => Auth::id(),
+                'user_name' => Auth::user()->name,
+                'action' => 'Scale Sheet Status Changed',
+                'details' => sprintf('Super Admin changed Scale Sheet #%s status from %s to %s.',
+                    $truckLoad->scale_sheet_no,
+                    strtoupper($oldStatus),
+                    strtoupper($truckLoad->status)
+                ),
+                'ip_address' => $request->ip(),
+            ]);
+        });
 
         $statusLabel = $truckLoad->status === 'completed' ? 'Finalized / Locked' : 'Draft / Unlocked';
         return back()->with('success', "Scale Sheet #{$truckLoad->scale_sheet_no} status updated to {$statusLabel}.");

@@ -80,6 +80,13 @@ class ScaleItem extends Model
      */
     public static function calculateBreretonVolume(int $diameterCm, float $lengthM): float
     {
+        if (abs($lengthM - 1.0) < 0.01) {
+            $radiusMeters = ($diameterCm / 100) / 2;
+            $thousandths = floor(pi() * ($radiusMeters ** 2) * $lengthM * 1000);
+
+            return $thousandths / 1000;
+        }
+
         // Official lookup table for standard lengths 2.6m, 1.3m, and 1.0m (values in m³)
         $lookup = [
             16 => ['2.6' => 0.052, '1.3' => 0.026, '1.0' => 0.020],

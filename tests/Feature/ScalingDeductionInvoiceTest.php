@@ -24,6 +24,9 @@ class ScalingDeductionInvoiceTest extends TestCase
         $this->actingAs($user)->get(route('scaling.create'))
             ->assertOk()
             ->assertSee('name="drivers_assistance" id="drivers_assistance" form="scaleForm"', false)
+            ->assertSee("row.querySelector('.row-qty, .row-qty-input')", false)
+            ->assertSee('control.dataset.submitName = control.name', false)
+            ->assertSee('restoreRowNames(row)', false)
             ->assertSee("setAttribute('form', 'scaleForm')", false);
 
         $response = $this->actingAs($user)->post(route('scaling.store'), [
@@ -74,6 +77,163 @@ class ScalingDeductionInvoiceTest extends TestCase
         $this->get(route('scaling.invoice.pdf', $truckLoad->id))
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
+    }
+
+    public function test_create_defaults_omitted_deduction_fields_to_zero(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($user)->post(route('scaling.store'), [
+            'supplier_name' => 'Missing Deductions Supplier',
+            'truck_plate_no' => 'ABC-000',
+            'date_unload' => '2026-09-30',
+            'date_scaled' => '2026-09-30',
+            'items' => [[
+                'category' => 'FALCATA',
+                'grade' => 'Good',
+                'length' => '2.6',
+                'diameter' => '20',
+                'quantity' => '1',
+            ]],
+        ]);
+
+        $truckLoad = TruckLoad::firstOrFail();
+        $response->assertRedirect(route('scaling.invoice.print', $truckLoad->id));
+        $this->assertSame(0.0, (float) $truckLoad->drivers_assistance);
+        $this->assertSame(0.0, (float) $truckLoad->expenses_deduction);
+        $this->assertSame(0.0, (float) $truckLoad->travel_paper_deduction);
+        $this->assertSame(0.0, (float) $truckLoad->trucking_deduction);
+        $this->assertSame(0.0, (float) $truckLoad->cash_advance);
+        $this->assertSame(0.0, (float) $truckLoad->other_deduction_amount);
+        $this->assertSame(0.0, (float) $truckLoad->total_deductions);
+        $this->assertSame(0.0, (float) $truckLoad->net_payable);
+    }
+
+    public function test_create_normalizes_legacy_deduction_request_names(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($user)->post(route('scaling.store'), [
+            'supplier_name' => 'Legacy Deduction Supplier',
+            'truck_plate_no' => 'ABC-001',
+            'date_unload' => '2026-09-30',
+            'date_scaled' => '2026-09-30',
+            'driver_assistance' => '500.00',
+            'expenses' => '500.00',
+            'travel_paper' => '500.00',
+            'trucking' => '500.00',
+            'cash_advance' => '500.00',
+            'other_deduction_label' => 'Snack',
+            'other_deduction' => '500.00',
+            'items' => [[
+                'category' => 'FALCATA',
+                'grade' => 'Good',
+                'length' => '2.6',
+                'diameter' => '20',
+                'quantity' => '1',
+                'volume' => '0.474',
+                'total_volume' => '0.474',
+                'subtotal' => '798.60',
+            ]],
+        ]);
+
+        $truckLoad = TruckLoad::firstOrFail();
+        $response->assertRedirect(route('scaling.invoice.print', $truckLoad->id));
+        $this->assertSame(500.0, (float) $truckLoad->drivers_assistance);
+        $this->assertSame(500.0, (float) $truckLoad->expenses_deduction);
+        $this->assertSame(500.0, (float) $truckLoad->travel_paper_deduction);
+        $this->assertSame(500.0, (float) $truckLoad->trucking_deduction);
+        $this->assertSame(500.0, (float) $truckLoad->cash_advance);
+        $this->assertSame('Snack', $truckLoad->other_deduction_label);
+        $this->assertSame(500.0, (float) $truckLoad->other_deduction_amount);
+        $this->assertSame(2500.0, (float) $truckLoad->total_deductions);
+
+        $this->get(route('scaling.invoice.print', $truckLoad->id))
+            ->assertOk()
+            ->assertSee('+ ₱ 500.00')
+            ->assertSee('Snack')
+            ->assertSee('- ₱ 2,500.00');
+    }
+
+    public function test_create_persists_high_capacity_amounts_and_log_counts(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($user)->post(route('scaling.store'), [
+            'supplier_name' => 'High Capacity Supplier',
+            'truck_plate_no' => 'BIG-446',
+            'date_unload' => '2026-09-30',
+            'date_scaled' => '2026-09-30',
+            'drivers_assistance' => '500000000.00',
+            'expenses_deduction' => '100000000.00',
+            'travel_paper_deduction' => '0.00',
+            'trucking_deduction' => '0.00',
+            'cash_advance' => '0.00',
+            'other_deduction_label' => '',
+            'other_deduction_amount' => '0.00',
+            'items' => [[
+                'category' => 'FALCATA',
+                'grade' => 'Good',
+                'length' => '2.6',
+                'diameter' => '20',
+                'quantity' => '446',
+                'volume' => '0.081',
+                'total_volume' => '36.126',
+                'subtotal' => '900000000.00',
+            ]],
+        ]);
+
+        $truckLoad = TruckLoad::with('scaleItems')->firstOrFail();
+        $response->assertRedirect(route('scaling.invoice.print', $truckLoad->id));
+        $this->assertSame(446, (int) $truckLoad->total_logs);
+        $this->assertSame(500000000.0, (float) $truckLoad->drivers_assistance);
+        $this->assertSame(100000000.0, (float) $truckLoad->total_deductions);
+        $this->assertSame(900000000.0, (float) $truckLoad->gross_amount);
+        $this->assertSame(1300000000.0, (float) $truckLoad->net_payable);
+        $this->assertSame(446, (int) $truckLoad->scaleItems->first()->quantity);
+        $this->assertSame(900000000.0, (float) $truckLoad->scaleItems->first()->subtotal);
+
+        $this->get(route('scaling.invoice.print', $truckLoad->id))
+            ->assertOk()
+            ->assertSee('+ ₱ 500,000,000.00')
+            ->assertSee('- ₱ 100,000,000.00')
+            ->assertSee('₱ 1,300,000,000.00');
+    }
+
+    public function test_scale_sheet_index_formats_currency_to_two_decimal_places(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+        $supplier = Supplier::create(['name' => 'Currency Formatting Supplier']);
+        TruckLoad::create([
+            'supplier_id' => $supplier->id,
+            'truck_plate_no' => 'FMT-001',
+            'scale_sheet_no' => '90003',
+            'invoice_no' => 'RMD-2026-9003',
+            'status' => 'completed',
+            'date_unload' => '2026-09-30',
+            'date_scaled' => '2026-09-30',
+            'gross_amount' => 502201775.36,
+            'total_deductions' => 0,
+            'net_payable' => 502201775.36,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('scaling.index'))
+            ->assertOk()
+            ->assertSee('₱ 502,201,775.36')
+            ->assertDontSee('502,201,775.360');
     }
 
     public function test_editing_a_scale_sheet_updates_deductions_and_invoice_net(): void
@@ -135,6 +295,69 @@ class ScalingDeductionInvoiceTest extends TestCase
             ->assertSee('₱ 5,000.00')
             ->assertSee('- ₱ 5,000.00')
             ->assertSee('₱ 5,834.00');
+    }
+
+    public function test_partial_scale_sheet_update_preserves_omitted_deductions(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+        $supplier = Supplier::create(['name' => 'Partial Edit Supplier']);
+        $truckLoad = TruckLoad::create([
+            'supplier_id' => $supplier->id,
+            'truck_plate_no' => 'ABC-789',
+            'scale_sheet_no' => '90002',
+            'invoice_no' => 'RMD-2026-9002',
+            'status' => 'completed',
+            'date_unload' => '2026-09-24',
+            'date_scaled' => '2026-09-24',
+            'gross_amount' => 1000.00,
+            'drivers_assistance' => 50.00,
+            'expenses_deduction' => 25.00,
+            'travel_paper_deduction' => 30.00,
+            'trucking_deduction' => 40.00,
+            'cash_advance' => 10.00,
+            'other_deduction_label' => 'Fuel',
+            'other_deduction_amount' => 15.00,
+            'total_deductions' => 120.00,
+            'net_payable' => 930.00,
+        ]);
+        ScaleItem::create([
+            'truck_load_id' => $truckLoad->id,
+            'wood_category' => 'FALCATA',
+            'grade' => 'Good',
+            'is_split' => false,
+            'length' => 2.6,
+            'diameter' => 20,
+            'quantity' => 1,
+            'volume' => 0.474,
+            'total_volume' => 0.474,
+            'price_per_cu_m' => 2110.0,
+            'subtotal' => 1000.00,
+        ]);
+
+        $this->actingAs($user)
+            ->put(route('scaling.update', ['scaling' => $truckLoad->id]), ['notes' => 'Updated notes'])
+            ->assertRedirect(route('scaling.show', ['scaling' => $truckLoad->id]));
+
+        $truckLoad->refresh();
+        $this->assertSame(50.0, (float) $truckLoad->drivers_assistance);
+        $this->assertSame(25.0, (float) $truckLoad->expenses_deduction);
+        $this->assertSame(30.0, (float) $truckLoad->travel_paper_deduction);
+        $this->assertSame(40.0, (float) $truckLoad->trucking_deduction);
+        $this->assertSame(10.0, (float) $truckLoad->cash_advance);
+        $this->assertSame('Fuel', $truckLoad->other_deduction_label);
+        $this->assertSame(15.0, (float) $truckLoad->other_deduction_amount);
+        $this->assertSame(120.0, (float) $truckLoad->total_deductions);
+        $this->assertSame(930.0, (float) $truckLoad->net_payable);
+
+        $this->get(route('scaling.invoice.print', $truckLoad->id))
+            ->assertOk()
+            ->assertSee('+ ₱ 50.00')
+            ->assertSee('Fuel')
+            ->assertSee('- ₱ 120.00')
+            ->assertSee('₱ 930.00');
     }
 
     public function test_store_preserves_split_rows_and_deductions_together(): void

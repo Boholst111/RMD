@@ -9,7 +9,7 @@
         }
 
         body {
-            font-family: 'Outfit', sans-serif;
+            font-family: 'DejaVu Sans', sans-serif;
             color: #0f172a;
             background: white;
             margin: 0;
@@ -234,9 +234,9 @@
                             <td>{{ $row['truck_plate'] }}</td>
                             <td class="text-right">{{ number_format($row['total_pieces']) }}</td>
                             <td class="text-right">{{ number_format($row['total_volume'], 3) }}</td>
-                            <td class="text-right">₱ {{ number_format($row['gross_amount'], 3) }}</td>
-                            <td class="text-right">₱ {{ number_format($row['total_deductions'], 3) }}</td>
-                            <td class="text-right">₱ {{ number_format($row['net_payout'], 3) }}</td>
+                            <td class="text-right">PHP {{ number_format($row['gross_amount'], 2) }}</td>
+                            <td class="text-right">PHP {{ number_format($row['total_deductions'], 2) }}</td>
+                            <td class="text-right">PHP {{ number_format($row['net_payout'], 2) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -244,9 +244,9 @@
 
             <div class="summary-block">
                 <div class="summary-row"><span class="summary-label">Grand Total Volume</span><span class="summary-value">{{ number_format($grandTotals['total_volume'], 3) }} m³</span></div>
-                <div class="summary-row"><span class="summary-label">Grand Gross Amount</span><span class="summary-value">₱ {{ number_format($grandTotals['gross'], 3) }}</span></div>
-                <div class="summary-row"><span class="summary-label">Grand Deductions</span><span class="summary-value">₱ {{ number_format($grandTotals['deductions'], 3) }}</span></div>
-                <div class="summary-row"><span class="summary-label">Grand Net Payable</span><span class="summary-value">₱ {{ number_format($grandTotals['net'], 3) }}</span></div>
+                <div class="summary-row"><span class="summary-label">Grand Gross Amount</span><span class="summary-value">PHP {{ number_format($grandTotals['gross'], 2) }}</span></div>
+                <div class="summary-row"><span class="summary-label">Grand Deductions</span><span class="summary-value">PHP {{ number_format($grandTotals['deductions'], 2) }}</span></div>
+                <div class="summary-row"><span class="summary-label">Grand Net Payable</span><span class="summary-value">PHP {{ number_format($grandTotals['net'], 2) }}</span></div>
             </div>
 
             <div class="report-footer">

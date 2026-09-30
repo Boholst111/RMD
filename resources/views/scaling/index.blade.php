@@ -96,7 +96,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Total Net Payable</p>
-                    <h3 class="text-3xl font-extrabold text-amber-300 mt-1">₱ {{ number_format($totalNetPayable, 3) }}</h3>
+                    <h3 class="text-3xl font-extrabold text-amber-300 mt-1">₱ {{ number_format($totalNetPayable, 2) }}</h3>
                 </div>
                 <div class="w-12 h-12 rounded-xl bg-amber-500/30 text-amber-300 flex items-center justify-center border border-amber-500/40">
                     <i class="fa-solid fa-coins text-xl"></i>
@@ -227,13 +227,13 @@
                                 {{ number_format($load->total_volume, 3) }}
                             </td>
                             <td class="px-6 py-4 text-right font-mono text-slate-200">
-                                {{ number_format($load->gross_amount, 3) }}
+                                {{ number_format($load->gross_amount, 2) }}
                             </td>
                             <td class="px-6 py-4 text-right font-mono text-rose-400">
-                                -{{ number_format($load->total_deductions, 3) }}
+                                -{{ number_format($load->total_deductions, 2) }}
                             </td>
                             <td class="px-6 py-4 text-right font-mono font-bold text-emerald-400 text-base">
-                                ₱ {{ number_format($load->net_payable, 3) }}
+                                ₱ {{ number_format($load->net_payable, 2) }}
                             </td>
                             <td class="px-6 py-4 text-center no-print">
                                 <div class="flex items-center justify-center gap-2">

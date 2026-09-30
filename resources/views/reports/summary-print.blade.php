@@ -224,6 +224,11 @@
             margin-top: 32px;
         }
 
+        .closing-block {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
         .signature-block {
             text-align: center;
             font-size: 0.78rem;
@@ -328,12 +333,13 @@
                             <td>{{ $row['scaled_date'] }}</td>
                             <td class="text-right monospace">{{ number_format($row['total_logs']) }}</td>
                             <td class="text-right monospace">{{ number_format($row['total_volume'], 3) }}</td>
-                            <td class="text-right monospace">₱ {{ number_format($row['net_payout'], 3) }}</td>
+                            <td class="text-right monospace">₱ {{ number_format($row['net_payout'], 2) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
 
+            <div class="closing-block">
             <div class="summary-panel">
                 <div class="summary-info">
                     <h3>Summary Totals</h3>
@@ -348,7 +354,7 @@
                 </div>
                 <div class="summary-highlight">
                     <span class="title">Net Total Supplier Payout</span>
-                    <span class="amount">₱ {{ number_format($grandTotals['net'], 3) }}</span>
+                    <span class="amount">₱ {{ number_format($grandTotals['net'], 2) }}</span>
                 </div>
             </div>
 
@@ -368,6 +374,7 @@
                     <span class="signature-title">Approved By</span>
                     <div>RMD Management</div>
                 </div>
+            </div>
             </div>
         </div>
     </div>

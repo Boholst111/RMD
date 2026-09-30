@@ -6,13 +6,14 @@
     <style>
         @page {
             size: A4 portrait;
-            margin: 12mm;
+            margin: 15mm 12mm 15mm 12mm;
         }
 
         body {
             font-family: 'DejaVu Sans', sans-serif;
-            color: #1e293b;
-            font-size: 11px;
+            color: #0f172a;
+            font-size: 10px;
+            line-height: 1.35;
             margin: 0;
             background: #ffffff;
         }
@@ -21,6 +22,13 @@
             width: 100%;
             padding: 0;
             margin: 0;
+        }
+
+        .report-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 18px;
+            background: #f8fafc;
+            padding: 24px;
         }
 
         .center {
@@ -38,7 +46,7 @@
 
         .brand-tag {
             font-size: 9px;
-            letter-spacing: 0.4em;
+            letter-spacing: 0.35em;
             text-transform: uppercase;
             font-weight: 800;
             color: #d97706;
@@ -46,10 +54,11 @@
         }
 
         .report-title {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 800;
             margin: 0;
             color: #0f172a;
+            line-height: 1.2;
         }
 
         .report-subtitle {
@@ -63,28 +72,34 @@
         .details {
             width: 100%;
             border: 1px solid #cbd5e1;
-            border-radius: 12px;
-            margin: 22px 0;
+            border-radius: 16px;
+            margin: 20px 0 16px;
             border-collapse: collapse;
+            background: #ffffff;
         }
 
         .details td {
-            padding: 10px 12px;
+            width: 50%;
+            padding: 14px 16px;
             vertical-align: top;
-            font-size: 10px;
-            color: #0f172a;
+            font-size: 9px;
+            color: #334155;
         }
 
-        .details .section-title {
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            font-weight: 700;
-            color: #334155;
-            padding-bottom: 8px;
+        .detail-line {
+            display: table;
+            width: 100%;
+            padding: 7px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .detail-line:last-child {
+            border-bottom: 0;
         }
 
         .details .label {
+            display: table-cell;
+            width: 45%;
             font-size: 8.8px;
             text-transform: uppercase;
             letter-spacing: 0.08em;
@@ -93,6 +108,7 @@
         }
 
         .details .value {
+            display: table-cell;
             font-weight: 700;
             color: #0f172a;
             text-align: right;
@@ -109,16 +125,18 @@
 
         table.report-table {
             width: 100%;
+            table-layout: fixed;
             border-collapse: collapse;
             font-size: 10px;
-            margin-top: 14px;
+            margin-top: 12px;
         }
 
         table.report-table th,
         table.report-table td {
             border: 1px solid #e2e8f0;
-            padding: 10px 8px;
+            padding: 9px 7px;
             vertical-align: middle;
+            word-wrap: break-word;
         }
 
         table.report-table th {
@@ -127,7 +145,8 @@
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            font-size: 9px;
+            font-size: 8px;
+            line-height: 1.3;
         }
 
         table.report-table td {
@@ -142,6 +161,21 @@
             background: #f8fafc;
         }
 
+        table.report-table thead {
+            display: table-header-group;
+        }
+
+        table.report-table tr,
+        .summary-section,
+        .signatures,
+        .closing-block {
+            page-break-inside: avoid;
+        }
+
+        .closing-block {
+            break-inside: avoid;
+        }
+
         .text-right {
             text-align: right;
         }
@@ -152,32 +186,30 @@
 
         .summary-section {
             width: 100%;
-            margin-top: 18px;
-            display: table;
+            margin-top: 20px;
             border-collapse: collapse;
         }
 
         .summary-left,
         .summary-right {
-            display: table-cell;
             vertical-align: top;
             padding: 0;
         }
 
         .summary-left {
-            padding-right: 12px;
-            width: 60%;
+            width: 58%;
+            padding-right: 10px;
         }
 
         .summary-right {
-            width: 40%;
+            width: 42%;
         }
 
         .summary-box {
             border: 1px solid #cbd5e1;
-            border-radius: 12px;
+            border-radius: 16px;
             background: #ffffff;
-            padding: 16px;
+            padding: 16px 18px;
         }
 
         .summary-box strong {
@@ -214,9 +246,9 @@
 
         .summary-highlight {
             border: 2px solid #16a34a;
-            border-radius: 12px;
+            border-radius: 16px;
             background: #ecfdf5;
-            padding: 16px;
+            padding: 18px;
             margin-top: 0;
         }
 
@@ -237,13 +269,13 @@
 
         .signatures {
             width: 100%;
-            margin-top: 28px;
+            margin-top: 30px;
             border-collapse: collapse;
         }
 
         .signature-cell {
-            width: 33%;
-            padding-top: 28px;
+            width: 33.33%;
+            padding: 28px 8px 0;
             text-align: center;
             font-size: 10px;
             color: #334155;
@@ -270,7 +302,8 @@
         $logoPath = public_path('images/logo.png');
         $logoData = file_exists($logoPath) ? base64_encode(file_get_contents($logoPath)) : null;
     @endphp
-    <div class="page">
+        <div class="page">
+            <div class="report-card">
         <div class="center">
             @if($logoData)
                 <img src="data:image/png;base64,{{ $logoData }}" class="logo" alt="RMD Logo">
@@ -287,7 +320,6 @@
         <table class="details" cellpadding="0" cellspacing="0">
             <tr>
                 <td>
-                    <div class="section-title">Summary Metadata</div>
                     <div class="detail-line">
                         <div class="label">Report Type</div>
                         <div class="value">{{ $reportType }}</div>
@@ -302,7 +334,6 @@
                     </div>
                 </td>
                 <td>
-                    <div class="section-title">Report Metadata</div>
                     <div class="detail-line">
                         <div class="label">Period Covered</div>
                         <div class="value">{{ $periodLabel }}</div>
@@ -317,15 +348,24 @@
 
         <div class="table-wrap">
             <table class="report-table" cellpadding="0" cellspacing="0">
+                <colgroup>
+                    <col style="width: 11%;">
+                    <col style="width: 21%;">
+                    <col style="width: 14%;">
+                    <col style="width: 14%;">
+                    <col style="width: 10%;">
+                    <col style="width: 15%;">
+                    <col style="width: 15%;">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>SHEET NO.</th>
                         <th>SUPPLIER NAME</th>
                         <th>TRUCK PLATE</th>
-                        <th>SCALED DATE</th>
+                        <th class="center">SCALED DATE</th>
                         <th class="text-right">TOTAL LOGS</th>
                         <th class="text-right">TOTAL VOLUME (M³)</th>
-                        <th class="text-right">NET PAYOUT (₱)</th>
+                        <th class="text-right">NET PAYOUT (PHP)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -334,31 +374,34 @@
                             <td class="monospace">{{ $row['sheet_no'] }}</td>
                             <td>{{ $row['supplier_name'] }}</td>
                             <td class="monospace">{{ $row['truck_plate'] }}</td>
-                            <td>{{ $row['scaled_date'] }}</td>
+                            <td class="center">{{ $row['scaled_date'] }}</td>
                             <td class="text-right monospace">{{ number_format($row['total_logs']) }}</td>
                             <td class="text-right monospace">{{ number_format($row['total_volume'], 3) }}</td>
-                            <td class="text-right monospace">₱ {{ number_format($row['net_payout'], 3) }}</td>
+                            <td class="text-right monospace">PHP {{ number_format($row['net_payout'], 2) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
         </div>
 
-        <div class="summary-section">
-            <div class="summary-left">
-                <div class="summary-box">
-                    <strong>Totals</strong>
-                    <div class="summary-row"><span class="label">Total Logs Scaled</span><span class="value">{{ number_format($grandTotals['total_logs']) }} pcs</span></div>
-                    <div class="summary-row"><span class="label">Total Combined Volume</span><span class="value">{{ number_format($grandTotals['total_volume'], 3) }} m³</span></div>
-                </div>
-            </div>
-            <div class="summary-right">
-                <div class="summary-highlight">
-                    <span class="label">NET TOTAL SUPPLIER PAYOUT</span>
-                    <span class="amount">₱ {{ number_format($grandTotals['net'], 3) }}</span>
-                </div>
-            </div>
-        </div>
+        <div class="closing-block">
+        <table class="summary-section" cellpadding="0" cellspacing="0">
+            <tr>
+                <td class="summary-left">
+                    <div class="summary-box">
+                        <strong>Summary Totals</strong>
+                        <div class="summary-row"><span class="label">Total Logs Scaled</span><span class="value">{{ number_format($grandTotals['total_logs']) }} pcs</span></div>
+                        <div class="summary-row"><span class="label">Total Combined Volume</span><span class="value">{{ number_format($grandTotals['total_volume'], 3) }} m³</span></div>
+                    </div>
+                </td>
+                <td class="summary-right">
+                    <div class="summary-highlight">
+                        <span class="label">Net Total Supplier Payout</span>
+                        <span class="amount">PHP {{ number_format($grandTotals['net'], 2) }}</span>
+                    </div>
+                </td>
+            </tr>
+        </table>
 
         <table class="signatures" cellpadding="0" cellspacing="0">
             <tr>
@@ -379,6 +422,8 @@
                 </td>
             </tr>
         </table>
+        </div>
+            </div>
     </div>
 </body>
 </html>

@@ -43,6 +43,39 @@ const volumeTable = {
     80: { '2.6': 1.306, '1.3': 0.653, '1.0': 0.502 }
 };
 
+function getLogVolume(diameterCm, lengthM) {
+    const diameter = Number(diameterCm) || 0;
+    const length = Number(lengthM) || 0;
+
+    if (Math.abs(length - 1.0) < 0.01) {
+        const radiusMeters = (diameter / 100) / 2;
+        const thousandths = Math.floor(Math.PI * radiusMeters ** 2 * length * 1000);
+
+        return {
+            value: thousandths / 1000,
+            thousandths,
+            formatted: `${Math.floor(thousandths / 1000)}.${String(thousandths % 1000).padStart(3, '0')}`,
+        };
+    }
+
+    const lengthKey = String(length);
+    const value = volumeTable[diameter]?.[lengthKey] !== undefined
+        ? Number(volumeTable[diameter][lengthKey])
+        : (0.7854 * Math.pow(diameter, 2) * length) / 10000;
+
+    return { value, thousandths: null, formatted: value.toFixed(3) };
+}
+
+function formatLogVolume(volume, quantity = 1) {
+    if (volume.thousandths !== null) {
+        const totalThousandths = volume.thousandths * quantity;
+
+        return `${Math.floor(totalThousandths / 1000)}.${String(totalThousandths % 1000).padStart(3, '0')}`;
+    }
+
+    return (volume.value * quantity).toFixed(3);
+}
+
 // Initial default template rows: even diameters from 16 to 80 (Length strictly 1.3m or 2.6m)
 const initialRows = Array.from({ length: 33 }, (_, index) => {
     const diameter = 16 + (index * 2);
@@ -505,29 +538,22 @@ function recalculateAll() {
         const dia = parseInt(r.querySelector('.row-dia').value) || 0;
         const qty = parseInt(r.querySelector('.row-qty').value) || 0;
 
-        let volPerLog = 0;
-        if (dia > 0 && len > 0) {
-            const key = String(len);
-            if (volumeTable[dia] && volumeTable[dia][key] !== undefined) {
-                volPerLog = Number(volumeTable[dia][key]);
-            } else {
-                volPerLog = (0.7854 * Math.pow(dia, 2) * len) / 10000;
-            }
-        }
+        const volume = getLogVolume(dia, len);
+        const volPerLog = volume.value;
         const totVol = qty * volPerLog;
         const rate = getMatchingRate(cat, len, dia, grade);
         const subtotal = totVol * rate;
 
-        r.querySelector('.row-vol-single').textContent = volPerLog.toFixed(3);
-        r.querySelector('.row-vol-tot').textContent = qty > 0 ? totVol.toFixed(3) : '0.000';
+        r.querySelector('.row-vol-single').textContent = volume.formatted;
+        r.querySelector('.row-vol-tot').textContent = qty > 0 ? formatLogVolume(volume, qty) : '0.000';
         r.querySelector('.row-rate').textContent = `₱ ${rate.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
         r.querySelector('.row-subtotal').textContent = qty > 0 ? `₱ ${subtotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '₱ 0.00';
 
         const volHidden = r.querySelector('.row-vol-hidden');
         const totVolHidden = r.querySelector('.row-total-vol-hidden');
         const subtotalHidden = r.querySelector('.row-subtotal-hidden');
-        if (volHidden) volHidden.value = volPerLog.toFixed(3);
-        if (totVolHidden) totVolHidden.value = totVol.toFixed(3);
+        if (volHidden) volHidden.value = volume.formatted;
+        if (totVolHidden) totVolHidden.value = formatLogVolume(volume, qty);
         if (subtotalHidden) subtotalHidden.value = subtotal.toFixed(2);
 
         standardTotalLogs += qty;
@@ -640,6 +666,37 @@ function recalculateAll() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    const scaleForm = document.getElementById('scaleForm');
+    const matrixRowsSelector = '#standardMatrixBody tr.row-item, #splitMatrixBody tr.row-item';
+    const restoreRowNames = row => row.querySelectorAll('[data-submit-name]').forEach(control => {
+        control.name = control.dataset.submitName;
+        delete control.dataset.submitName;
+    });
+
+    if (scaleForm) {
+        ['input', 'change', 'click'].forEach(eventName => {
+            scaleForm.addEventListener(eventName, event => {
+                const row = event.target.closest(matrixRowsSelector);
+                if (row) restoreRowNames(row);
+            });
+        });
+
+        scaleForm.addEventListener('submit', () => {
+            scaleForm.querySelectorAll(matrixRowsSelector).forEach(row => {
+                const quantity = parseInt(row.querySelector('.row-qty, .row-qty-input')?.value || '0', 10) || 0;
+                if (quantity > 0) {
+                    restoreRowNames(row);
+                    return;
+                }
+
+                row.querySelectorAll('[name^="items["]').forEach(control => {
+                    control.dataset.submitName = control.name;
+                    control.removeAttribute('name');
+                });
+            });
+        });
+    }
+
     // AUTO-REFRESH PRICES ON PAGE LOAD (ensures fresh rates from superadmin updates)
     const autoRefreshPrices = async () => {
         try {

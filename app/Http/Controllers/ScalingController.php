@@ -147,8 +147,13 @@ class ScalingController extends Controller
 
         $dateGenerated = \Carbon\Carbon::now()->format('M d, Y');
         $generatedBy = auth()->user()?->name ?? auth()->user()?->email ?? 'System';
+        $allowedRemoteHosts = array_values(array_filter([
+            parse_url(config('app.url'), PHP_URL_HOST),
+        ]));
 
         $pdf = Pdf::loadView('reports.summary-pdf', compact('reportRows', 'grandTotals', 'periodLabel', 'dateGenerated', 'generatedBy', 'reportType'))
+            ->setOption('isRemoteEnabled', true)
+            ->setOption('allowedRemoteHosts', $allowedRemoteHosts)
             ->setPaper('a4', 'portrait');
 
         $safeLabel = Str::slug($periodLabel) ?: 'scale-sheet-report';
@@ -262,6 +267,28 @@ class ScalingController extends Controller
      */
     public function store(Request $request)
     {
+        $deductionAliases = [
+            'drivers_assistance' => ['driver_assistance'],
+            'expenses_deduction' => ['expenses'],
+            'travel_paper_deduction' => ['travel_paper'],
+            'trucking_deduction' => ['trucking'],
+            'cash_advance' => [],
+            'other_deduction_amount' => ['other_deduction'],
+        ];
+        $requestInput = $request->all();
+        foreach ($deductionAliases as $field => $aliases) {
+            if (! array_key_exists($field, $requestInput)) {
+                foreach ($aliases as $alias) {
+                    if (array_key_exists($alias, $requestInput)) {
+                        $requestInput[$field] = $requestInput[$alias];
+                        break;
+                    }
+                }
+            }
+
+            $request->merge([$field => $requestInput[$field] ?? 0]);
+        }
+
         $filteredItems = collect($request->input('items', []))
             ->filter(function ($item) {
                 return isset($item['quantity']) && (int) $item['quantity'] > 0;
@@ -279,13 +306,13 @@ class ScalingController extends Controller
             'date_scaled' => 'required|date',
             'scaled_by' => 'nullable|string|max:100',
             'notes' => 'nullable|string',
-            'drivers_assistance' => 'nullable|numeric|min:0',
-            'expenses_deduction' => 'nullable|numeric|min:0',
-            'travel_paper_deduction' => 'nullable|numeric|min:0',
-            'trucking_deduction' => 'nullable|numeric|min:0',
-            'cash_advance' => 'nullable|numeric|min:0',
+            'drivers_assistance' => 'nullable|numeric|min:0|max:999999999999.99',
+            'expenses_deduction' => 'nullable|numeric|min:0|max:999999999999.99',
+            'travel_paper_deduction' => 'nullable|numeric|min:0|max:999999999999.99',
+            'trucking_deduction' => 'nullable|numeric|min:0|max:999999999999.99',
+            'cash_advance' => 'nullable|numeric|min:0|max:999999999999.99',
             'other_deduction_label' => 'nullable|string|max:150',
-            'other_deduction_amount' => 'nullable|numeric|min:0',
+            'other_deduction_amount' => 'nullable|numeric|min:0|max:999999999999.99',
             'items' => 'required|array|min:1',
             'items.*.category' => 'required|string|max:120',
             'items.*.grade' => 'required|string|max:100',
@@ -296,13 +323,14 @@ class ScalingController extends Controller
             'items.*.split_group_id' => 'nullable|string|max:100',
             'items.*.parent_log_id' => 'nullable|integer',
             'items.*.split_side' => 'nullable|string|in:A,B',
-            'items.*.volume' => 'nullable|numeric|min:0',
-            'items.*.total_volume' => 'nullable|numeric|min:0',
-            'items.*.subtotal' => 'nullable|numeric|min:0',
+            'items.*.volume' => 'nullable|numeric|min:0|max:99999999999.9999',
+            'items.*.total_volume' => 'nullable|numeric|min:0|max:99999999999.9999',
+            'items.*.subtotal' => 'nullable|numeric|min:0|max:999999999999.99',
         ]);
 
-        DB::beginTransaction();
         try {
+            DB::beginTransaction();
+
             $rawSupplierName = trim($request->input('supplier_name') ?? '');
             if (! $rawSupplierName && $request->filled('supplier_id')) {
                 $existingSupplierObj = Supplier::find($request->input('supplier_id'));
@@ -324,8 +352,6 @@ class ScalingController extends Controller
 
             $currentYear = date('Y', strtotime($validated['date_scaled']));
 
-            // Reserve atomic scale_sheet_no
-            $sheetNo = null;
             $row = FacadesDB::table('scale_sheet_counters')->where('name', 'scale_sheet_no')->lockForUpdate()->first();
             if (!$row) {
                 FacadesDB::table('scale_sheet_counters')->insert(['name' => 'scale_sheet_no', 'last_value' => 89270, 'created_at' => now(), 'updated_at' => now()]);
@@ -335,7 +361,6 @@ class ScalingController extends Controller
             FacadesDB::table('scale_sheet_counters')->where('id', $row->id)->update(['last_value' => $next, 'updated_at' => now()]);
             $sheetNo = (string) $next;
 
-            // The locked counter serializes creates; derive invoice sequence from invoice numbers, not timestamps.
             $invoicePrefix = "RMD-{$currentYear}-";
             $lastInvoiceSequence = TruckLoad::withTrashed()
                 ->where('invoice_no', 'like', $invoicePrefix . '%')
@@ -347,7 +372,6 @@ class ScalingController extends Controller
                 }, 0);
             $invoiceNo = sprintf('RMD-%s-%04d', $currentYear, $lastInvoiceSequence + 1);
 
-            // Create TruckLoad record
             $truckLoad = TruckLoad::create([
                 'supplier_id' => $supplier->id,
                 'truck_plate_no' => strtoupper(trim($request->input('truck_plate_no'))),
@@ -370,7 +394,6 @@ class ScalingController extends Controller
             $totalLogs = 0;
             $totalVolume = 0.0;
             $grossAmount = 0.0;
-
             $splitChildRows = [];
             $splitParentMap = [];
 
@@ -479,12 +502,14 @@ class ScalingController extends Controller
             return redirect()->route('scaling.invoice.print', $truckLoad->id)
                 ->with('success', "Invoice #{$truckLoad->invoice_no} (Scale Sheet #{$truckLoad->scale_sheet_no}) generated successfully!");
             } catch (\Throwable $e) {
-            DB::rollBack();
+                if (DB::transactionLevel() > 0) {
+                    DB::rollBack();
+                }
             if ($e instanceof ValidationException) {
                 return redirect()->back()->withInput()->withErrors($e->errors());
             }
 
-            Log::error('Scaling store failed', ['error' => $e->getMessage()]);
+                Log::error($e->getMessage());
             return redirect()->back()->withInput()->with('error', 'Unable to save the scale sheet. Please try again or contact support.');
         }
     }
@@ -511,13 +536,13 @@ class ScalingController extends Controller
     {
         $sheet = TruckLoad::findOrFail($id);
         $validated = $request->validate([
-            'drivers_assistance' => 'nullable|numeric|min:0',
-            'expenses_deduction' => 'nullable|numeric|min:0',
-            'travel_paper_deduction' => 'nullable|numeric|min:0',
-            'trucking_deduction' => 'nullable|numeric|min:0',
-            'cash_advance' => 'nullable|numeric|min:0',
+            'drivers_assistance' => 'nullable|numeric|min:0|max:999999999999.99',
+            'expenses_deduction' => 'nullable|numeric|min:0|max:999999999999.99',
+            'travel_paper_deduction' => 'nullable|numeric|min:0|max:999999999999.99',
+            'trucking_deduction' => 'nullable|numeric|min:0|max:999999999999.99',
+            'cash_advance' => 'nullable|numeric|min:0|max:999999999999.99',
             'other_deduction_label' => 'nullable|string|max:150',
-            'other_deduction_amount' => 'nullable|numeric|min:0',
+            'other_deduction_amount' => 'nullable|numeric|min:0|max:999999999999.99',
             'notes' => 'nullable|string',
             'date_scaled' => 'nullable|date',
             'date_unload' => 'nullable|date',
@@ -531,18 +556,32 @@ class ScalingController extends Controller
             'items.*.split_group_id' => 'nullable|string|max:100',
             'items.*.parent_log_id' => 'nullable|integer',
             'items.*.split_side' => 'nullable|string|in:A,B',
-            'items.*.volume' => 'nullable|numeric|min:0',
-            'items.*.total_volume' => 'nullable|numeric|min:0',
-            'items.*.subtotal' => 'nullable|numeric|min:0',
+            'items.*.volume' => 'nullable|numeric|min:0|max:99999999999.9999',
+            'items.*.total_volume' => 'nullable|numeric|min:0|max:99999999999.9999',
+            'items.*.subtotal' => 'nullable|numeric|min:0|max:999999999999.99',
         ]);
 
-        $driversAssistance = (float) ($validated['drivers_assistance'] ?? 0);
-        $expensesDeduction = (float) ($validated['expenses_deduction'] ?? 0);
-        $travelPaper = (float) ($validated['travel_paper_deduction'] ?? 0);
-        $truckingDeduction = (float) ($validated['trucking_deduction'] ?? 0);
-        $cashAdvance = (float) ($validated['cash_advance'] ?? 0);
-        $otherDeductionLabel = $validated['other_deduction_label'] ?? null;
-        $otherDeductionAmount = (float) ($validated['other_deduction_amount'] ?? 0);
+        $driversAssistance = array_key_exists('drivers_assistance', $validated)
+            ? (float) ($validated['drivers_assistance'] ?? 0)
+            : (float) $sheet->drivers_assistance;
+        $expensesDeduction = array_key_exists('expenses_deduction', $validated)
+            ? (float) ($validated['expenses_deduction'] ?? 0)
+            : (float) $sheet->expenses_deduction;
+        $travelPaper = array_key_exists('travel_paper_deduction', $validated)
+            ? (float) ($validated['travel_paper_deduction'] ?? 0)
+            : (float) $sheet->travel_paper_deduction;
+        $truckingDeduction = array_key_exists('trucking_deduction', $validated)
+            ? (float) ($validated['trucking_deduction'] ?? 0)
+            : (float) $sheet->trucking_deduction;
+        $cashAdvance = array_key_exists('cash_advance', $validated)
+            ? (float) ($validated['cash_advance'] ?? 0)
+            : (float) $sheet->cash_advance;
+        $otherDeductionLabel = array_key_exists('other_deduction_label', $validated)
+            ? $validated['other_deduction_label']
+            : $sheet->other_deduction_label;
+        $otherDeductionAmount = array_key_exists('other_deduction_amount', $validated)
+            ? (float) ($validated['other_deduction_amount'] ?? 0)
+            : (float) $sheet->other_deduction_amount;
 
         $totalDeductions = $expensesDeduction + $travelPaper + $truckingDeduction + $cashAdvance + $otherDeductionAmount;
         $netPayable = (float) $sheet->gross_amount - $totalDeductions + $driversAssistance;
@@ -917,7 +956,9 @@ class ScalingController extends Controller
         }
 
         $sheetNo = $truckLoad->scale_sheet_no;
-        $truckLoad->delete();
+            DB::transaction(function () use ($truckLoad) {
+                $truckLoad->delete();
+            });
 
         return redirect()->route('scaling.index')
             ->with('success', "Scale Sheet #{$sheetNo} deleted successfully.");
