@@ -170,6 +170,15 @@ function getMatchingRate(category, length, diameter, grade) {
     return 0.00;
 }
 
+function getRowRate(row, savedRateKey, category, length, diameter, grade) {
+    const savedRate = row.dataset[savedRateKey];
+    if (row.dataset.historicalRatesDirty !== 'true' && savedRate !== undefined && Number.isFinite(Number(savedRate))) {
+        return Number(savedRate);
+    }
+
+    return getMatchingRate(category, length, diameter, grade);
+}
+
 function addRow(data = { category: defaultCategory, grade: 'Good', is_split: false, split_group_id: '', length: '2.6', diameter: 20, quantity: 1, isPreset: false }) {
     rowIndex++;
     const isSplit = data.is_split || false;
@@ -194,29 +203,27 @@ function addRow(data = { category: defaultCategory, grade: 'Good', is_split: fal
             <!-- Part A hidden inputs -->
             <input type="hidden" name="items[${rowIndex}_A][is_split]" value="1">
             <input type="hidden" name="items[${rowIndex}_A][split_group_id]" value="split_${rowIndex}">
-            <input type="hidden" name="items[${rowIndex}_A][parent_log_id]" value="">
             <input type="hidden" name="items[${rowIndex}_A][split_side]" value="A">
             <input type="hidden" name="items[${rowIndex}_A][category]" class="row-cat-hidden-a" value="${data.category}">
             <input type="hidden" name="items[${rowIndex}_A][grade]" class="row-grade-hidden-a" value="${defaultGradeA}">
             <input type="hidden" name="items[${rowIndex}_A][length]" class="row-len-hidden-a" value="${defaultLengthA}">
             <input type="hidden" name="items[${rowIndex}_A][diameter]" class="row-dia-hidden-a" value="${defaultDiaA}">
             <input type="hidden" name="items[${rowIndex}_A][quantity]" class="row-qty-hidden-a" value="${data.quantity}">
-            <input type="hidden" name="items[${rowIndex}_A][volume]" class="row-volume-hidden-a" value="0.000">
-            <input type="hidden" name="items[${rowIndex}_A][total_volume]" class="row-total-volume-hidden-a" value="0.000">
+            <input type="hidden" class="row-volume-hidden-a" value="0.000">
+            <input type="hidden" class="row-total-volume-hidden-a" value="0.000">
             <input type="hidden" name="items[${rowIndex}_A][subtotal]" class="row-subtotal-hidden-a" value="0.00">
 
             <!-- Part B hidden inputs -->
             <input type="hidden" name="items[${rowIndex}_B][is_split]" value="1">
             <input type="hidden" name="items[${rowIndex}_B][split_group_id]" value="split_${rowIndex}">
-            <input type="hidden" name="items[${rowIndex}_B][parent_log_id]" value="">
             <input type="hidden" name="items[${rowIndex}_B][split_side]" value="B">
             <input type="hidden" name="items[${rowIndex}_B][category]" class="row-cat-hidden-b" value="${data.category}">
             <input type="hidden" name="items[${rowIndex}_B][grade]" class="row-grade-hidden-b" value="${defaultGradeB}">
             <input type="hidden" name="items[${rowIndex}_B][length]" class="row-len-hidden-b" value="${defaultLengthB}">
             <input type="hidden" name="items[${rowIndex}_B][diameter]" class="row-dia-hidden-b" value="${defaultDiaB}">
             <input type="hidden" name="items[${rowIndex}_B][quantity]" class="row-qty-hidden-b" value="${data.quantity}">
-            <input type="hidden" name="items[${rowIndex}_B][volume]" class="row-volume-hidden-b" value="0.000">
-            <input type="hidden" name="items[${rowIndex}_B][total_volume]" class="row-total-volume-hidden-b" value="0.000">
+            <input type="hidden" class="row-volume-hidden-b" value="0.000">
+            <input type="hidden" class="row-total-volume-hidden-b" value="0.000">
             <input type="hidden" name="items[${rowIndex}_B][subtotal]" class="row-subtotal-hidden-b" value="0.00">
             </td>
 
@@ -408,8 +415,8 @@ function addRow(data = { category: defaultCategory, grade: 'Good', is_split: fal
 
         tr.innerHTML = `
             <td hidden>
-            <input type="hidden" name="items[${rowIndex}][volume]" class="row-vol-hidden" value="0.000">
-            <input type="hidden" name="items[${rowIndex}][total_volume]" class="row-total-vol-hidden" value="0.000">
+            <input type="hidden" class="row-vol-hidden" value="0.000">
+            <input type="hidden" class="row-total-vol-hidden" value="0.000">
             <input type="hidden" name="items[${rowIndex}][subtotal]" class="row-subtotal-hidden" value="0.00">
             </td>
             <td class="px-3 py-3 text-center text-xs text-slate-500 font-mono row-num">1</td>
@@ -541,7 +548,7 @@ function recalculateAll() {
         const volume = getLogVolume(dia, len);
         const volPerLog = volume.value;
         const totVol = qty * volPerLog;
-        const rate = getMatchingRate(cat, len, dia, grade);
+        const rate = getRowRate(r, 'savedRate', cat, len, dia, grade);
         const subtotal = totVol * rate;
 
         r.querySelector('.row-vol-single').textContent = volume.formatted;
@@ -590,8 +597,8 @@ function recalculateAll() {
         const totVol = qty * combinedVolSingle;
 
         // Dynamic Rates per segment specs using independent diameter A and diameter B
-        const rateA = getMatchingRate(cat, lenA, diaA, gradeA);
-        const rateB = getMatchingRate(cat, lenB, diaB, gradeB);
+        const rateA = getRowRate(r, 'savedRateA', cat, lenA, diaA, gradeA);
+        const rateB = getRowRate(r, 'savedRateB', cat, lenB, diaB, gradeB);
         
         // Subtotal
         const subtotalA = qty * volA * rateA;

@@ -73,48 +73,6 @@ class WoodScalingSeeder extends Seeder
             'address' => 'San Francisco, Agusan del Sur',
         ]);
 
-        // 2. Refresh the demo FALCATA and SAWMILL rows without deleting custom categories.
-        $falcataRanges = [
-            ['min' => 16, 'max' => 18, 'price' => 1400.00],
-            ['min' => 20, 'max' => 24, 'price' => 1800.00],
-            ['min' => 26, 'max' => 28, 'price' => 2350.00],
-            ['min' => 30, 'max' => 38, 'price' => 2850.00],
-            ['min' => 40, 'max' => 48, 'price' => 3150.00],
-            ['min' => 50, 'max' => 58, 'price' => 3250.00],
-            ['min' => 60, 'max' => 999, 'price' => 3350.00],
-        ];
-
-        $lengths = [1.30, 2.60];
-
-        foreach ($lengths as $len) {
-            foreach ($falcataRanges as $r) {
-                PriceMatrix::updateOrCreate(
-                    [
-                        'category' => 'FALCATA',
-                        'length' => $len,
-                        'dia_min' => $r['min'],
-                        'dia_max' => $r['max'],
-                    ],
-                    [
-                        'price_per_cu_m' => $r['price'],
-                    ]
-                );
-            }
-
-            // Sawmill Grade spec for Falcata
-            PriceMatrix::updateOrCreate(
-                [
-                    'category' => 'SAWMILL',
-                    'length' => $len,
-                    'dia_min' => 0,
-                    'dia_max' => 0,
-                ],
-                [
-                    'price_per_cu_m' => 1800.00,
-                ]
-            );
-        }
-
         // 3. Create Sample Scale Sheet (Truck Load)
         $load = TruckLoad::firstOrCreate(
             ['invoice_no' => 'RMD-2026-0001'],

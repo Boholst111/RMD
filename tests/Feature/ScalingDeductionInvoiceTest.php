@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\TruckLoad;
 use App\Models\User;
 use App\Models\ScaleItem;
+use App\Models\PriceMatrix;
 use App\Models\Supplier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -209,6 +210,174 @@ class ScalingDeductionInvoiceTest extends TestCase
             ->assertSee('₱ 1,300,000,000.00');
     }
 
+    public function test_full_standard_and_split_matrices_preserve_deductions(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+        $items = [];
+
+        for ($index = 0; $index < 33; $index++) {
+            $diameter = 16 + ($index * 2);
+            $items['standard_' . $index] = [
+                'category' => 'FALCATA',
+                'grade' => 'Good',
+                'length' => '2.6',
+                'diameter' => (string) $diameter,
+                'quantity' => $index === 20 ? '1.0' : '1',
+            ];
+
+            $splitGroup = 'matrix_split_' . $index;
+            foreach (['A', 'B'] as $side) {
+                $items['split_' . $index . '_' . $side] = [
+                    'category' => 'FALCATA',
+                    'grade' => $side === 'A' ? 'Good' : 'Sawmill',
+                    'length' => '1.3',
+                    'diameter' => (string) $diameter,
+                    'quantity' => '1',
+                    'is_split' => '1',
+                    'split_group_id' => $splitGroup,
+                    'split_side' => $side,
+                ];
+            }
+        }
+
+        $response = $this->actingAs($user)->post(route('scaling.store'), [
+            'supplier_name' => 'Full Matrix Supplier',
+            'truck_plate_no' => 'FULL-BOX',
+            'date_unload' => '2026-09-30',
+            'date_scaled' => '2026-09-30',
+            'drivers_assistance' => '50000.00',
+            'expenses_deduction' => '5000.00',
+            'travel_paper_deduction' => '5000.00',
+            'trucking_deduction' => '5000.00',
+            'cash_advance' => '5000.00',
+            'other_deduction_label' => 'Other',
+            'other_deduction_amount' => '5000.00',
+            'items' => $items,
+        ]);
+
+        $truckLoad = TruckLoad::with('scaleItems')->firstOrFail();
+        $response->assertRedirect(route('scaling.invoice.print', $truckLoad->id));
+        $this->assertCount(99, $truckLoad->scaleItems);
+        $this->assertSame(66, (int) $truckLoad->total_logs);
+        $this->assertSame(50000.0, (float) $truckLoad->drivers_assistance);
+        $this->assertSame(25000.0, (float) $truckLoad->total_deductions);
+
+        $this->get(route('scaling.invoice.print', $truckLoad->id))
+            ->assertOk()
+            ->assertSee('+ ₱ 50,000.00')
+            ->assertSee('- ₱ 25,000.00');
+    }
+
+    public function test_full_edit_matrix_preserves_deductions(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+        $supplier = Supplier::create(['name' => 'Full Edit Matrix Supplier']);
+        $truckLoad = TruckLoad::create([
+            'supplier_id' => $supplier->id,
+            'truck_plate_no' => 'EDIT-FULL',
+            'scale_sheet_no' => '90004',
+            'invoice_no' => 'RMD-2026-9004',
+            'status' => 'completed',
+            'date_unload' => '2026-09-30',
+            'date_scaled' => '2026-09-30',
+            'gross_amount' => 500.00,
+            'net_payable' => 500.00,
+        ]);
+        ScaleItem::create([
+            'truck_load_id' => $truckLoad->id,
+            'wood_category' => 'FALCATA',
+            'grade' => 'Good',
+            'length' => 2.6,
+            'diameter' => 20,
+            'quantity' => 1,
+            'volume' => 0.081,
+            'total_volume' => 0.081,
+            'price_per_cu_m' => 6172.84,
+            'subtotal' => 500.00,
+        ]);
+
+        $items = [];
+        for ($index = 0; $index < 33; $index++) {
+            $diameter = 16 + ($index * 2);
+            $items['standard_' . $index] = [
+                'category' => 'FALCATA',
+                'grade' => 'Good',
+                'length' => '2.6',
+                'diameter' => (string) $diameter,
+                'quantity' => $index === 20 ? '1.0' : '1',
+            ];
+
+            $splitGroup = 'edit_split_' . $index;
+            foreach (['A', 'B'] as $side) {
+                $items['split_' . $index . '_' . $side] = [
+                    'category' => 'FALCATA',
+                    'grade' => $side === 'A' ? 'Good' : 'Sawmill',
+                    'length' => '1.3',
+                    'diameter' => (string) $diameter,
+                    'quantity' => '1',
+                    'is_split' => '1',
+                    'split_group_id' => $splitGroup,
+                    'split_side' => $side,
+                ];
+            }
+        }
+
+        $response = $this->actingAs($user)->put(route('scaling.update', ['scaling' => $truckLoad->id]), [
+            'drivers_assistance' => '50000.00',
+            'expenses_deduction' => '5000.00',
+            'travel_paper_deduction' => '5000.00',
+            'trucking_deduction' => '5000.00',
+            'cash_advance' => '5000.00',
+            'other_deduction_label' => 'Other',
+            'other_deduction_amount' => '5000.00',
+            'items' => $items,
+        ]);
+
+        $response->assertRedirect(route('scaling.show', ['scaling' => $truckLoad->id]));
+        $truckLoad->refresh();
+
+        $this->assertCount(99, $truckLoad->scaleItems()->get());
+        $this->assertSame(50000.0, (float) $truckLoad->drivers_assistance);
+        $this->assertSame(25000.0, (float) $truckLoad->total_deductions);
+        $this->assertSame((float) $truckLoad->gross_amount + 25000.0, (float) $truckLoad->net_payable);
+
+        $this->get(route('scaling.invoice.print', $truckLoad->id))
+            ->assertOk()
+            ->assertSee('+ ₱ 50,000.00')
+            ->assertSee('- ₱ 25,000.00');
+    }
+
+    public function test_fractional_log_quantities_are_rejected(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($user)
+            ->from(route('scaling.create'))
+            ->post(route('scaling.store'), [
+                'supplier_name' => 'Fractional Quantity Supplier',
+                'truck_plate_no' => 'FRACTIONAL-1',
+                'date_unload' => '2026-09-30',
+                'date_scaled' => '2026-09-30',
+                'items' => [[
+                    'category' => 'FALCATA',
+                    'grade' => 'Good',
+                    'length' => '2.6',
+                    'diameter' => '20',
+                    'quantity' => '1.5',
+                ]],
+            ])
+            ->assertSessionHasErrors('items.0.quantity');
+    }
+
     public function test_scale_sheet_index_formats_currency_to_two_decimal_places(): void
     {
         $user = User::factory()->create([
@@ -295,6 +464,98 @@ class ScalingDeductionInvoiceTest extends TestCase
             ->assertSee('₱ 5,000.00')
             ->assertSee('- ₱ 5,000.00')
             ->assertSee('₱ 5,834.00');
+    }
+
+    public function test_invoice_breakdown_uses_saved_rate_when_matrix_rate_changes(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+        $supplier = Supplier::create(['name' => 'Historical Rate Supplier']);
+        PriceMatrix::create([
+            'category' => 'SAWMILL',
+            'length' => 2.6,
+            'dia_min' => 0,
+            'dia_max' => 0,
+            'price_per_cu_m' => 50000,
+        ]);
+        $truckLoad = TruckLoad::create([
+            'supplier_id' => $supplier->id,
+            'truck_plate_no' => 'HIST-RATE',
+            'scale_sheet_no' => '90005',
+            'invoice_no' => 'RMD-2026-9005',
+            'status' => 'completed',
+            'date_unload' => '2026-09-30',
+            'date_scaled' => '2026-09-30',
+            'gross_amount' => 500000,
+            'net_payable' => 500000,
+        ]);
+        ScaleItem::create([
+            'truck_load_id' => $truckLoad->id,
+            'wood_category' => 'SAWMILL',
+            'grade' => 'Sawmill',
+            'length' => 2.6,
+            'diameter' => 20,
+            'quantity' => 1,
+            'volume' => 0.5,
+            'total_volume' => 0.5,
+            'price_per_cu_m' => 1000000,
+            'subtotal' => 500000,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('scaling.invoice.print', $truckLoad->id))
+            ->assertOk()
+            ->assertSee('₱ 1,000,000.00')
+            ->assertSee('₱ 500,000.00')
+            ->assertDontSee('₱ 50,000.00');
+    }
+
+    public function test_sawmill_grade_uses_global_sawmill_rate_for_falcata_logs(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'super_admin',
+            'status' => 'active',
+        ]);
+        PriceMatrix::create([
+            'category' => 'FALCATA',
+            'length' => 2.6,
+            'dia_min' => 20,
+            'dia_max' => 24,
+            'price_per_cu_m' => 2000,
+        ]);
+        PriceMatrix::create([
+            'category' => 'SAWMILL',
+            'length' => 2.6,
+            'dia_min' => 0,
+            'dia_max' => 0,
+            'price_per_cu_m' => 1800,
+        ]);
+
+        $response = $this->actingAs($user)->post(route('scaling.store'), [
+            'supplier_name' => 'Sawmill Rate Supplier',
+            'truck_plate_no' => 'SM-RATE-1',
+            'date_unload' => '2026-09-30',
+            'date_scaled' => '2026-09-30',
+            'items' => [[
+                'category' => 'FALCATA',
+                'grade' => 'Sawmill',
+                'length' => '2.6',
+                'diameter' => '20',
+                'quantity' => '1',
+            ]],
+        ]);
+
+        $truckLoad = TruckLoad::with('scaleItems')->firstOrFail();
+        $response->assertRedirect(route('scaling.invoice.print', $truckLoad->id));
+        $this->assertSame(1800.0, (float) $truckLoad->scaleItems->first()->price_per_cu_m);
+        $this->assertSame(145.8, (float) $truckLoad->gross_amount);
+
+        $this->get(route('scaling.invoice.print', $truckLoad->id))
+            ->assertOk()
+            ->assertSee('₱ 1,800.00')
+            ->assertSee('₱ 145.80');
     }
 
     public function test_partial_scale_sheet_update_preserves_omitted_deductions(): void
@@ -408,7 +669,7 @@ class ScalingDeductionInvoiceTest extends TestCase
                     'split_group_id' => 'split_test',
                     'split_side' => 'B',
                     'category' => 'FALCATA',
-                    'grade' => 'Sawmill',
+                    'grade' => 'SAWMILL',
                     'length' => '1.3',
                     'diameter' => '60',
                     'quantity' => '1',
@@ -428,6 +689,16 @@ class ScalingDeductionInvoiceTest extends TestCase
         $this->assertSame(3094.0, (float) $truckLoad->gross_amount);
         $this->assertSame(600.0, (float) $truckLoad->total_deductions);
         $this->assertSame(3494.0, (float) $truckLoad->net_payable);
+
+        $this->actingAs($user)
+            ->get(route('scaling.invoice.print', $truckLoad->id))
+            ->assertOk()
+            ->assertSee('Sawmill (SM)');
+
+        $this->actingAs($user)
+            ->get(route('scaling.show', $truckLoad->id))
+            ->assertOk()
+            ->assertSee('Sawmill (SM)');
     }
 
     public function test_invoice_sequence_uses_existing_invoice_numbers_not_created_at(): void

@@ -508,30 +508,28 @@
                 <!-- Part A hidden inputs -->
                 <input type="hidden" name="items[${rowIndex}_A][is_split]" value="1">
                 <input type="hidden" name="items[${rowIndex}_A][split_group_id]" value="split_${rowIndex}">
-                <input type="hidden" name="items[${rowIndex}_A][parent_log_id]" value="">
                 <input type="hidden" name="items[${rowIndex}_A][split_side]" value="A">
                 <input type="hidden" name="items[${rowIndex}_A][category]" class="row-cat-hidden-a" value="${data.category}">
                 <input type="hidden" name="items[${rowIndex}_A][grade]" class="row-grade-hidden-a" value="${defaultGradeA}">
                 <input type="hidden" name="items[${rowIndex}_A][length]" class="row-len-hidden-a" value="${defaultLengthA}">
                 <input type="hidden" name="items[${rowIndex}_A][diameter]" class="row-dia-hidden-a" value="${defaultDiaA}">
                 <input type="hidden" name="items[${rowIndex}_A][quantity]" class="row-qty-hidden-a" value="${data.quantity}">
-                <input type="hidden" name="items[${rowIndex}_A][volume]" class="row-volume-hidden-a" value="0.000">
-                <input type="hidden" name="items[${rowIndex}_A][total_volume]" class="row-total-volume-hidden-a" value="0.000">
-                <input type="hidden" name="items[${rowIndex}_A][subtotal]" class="row-subtotal-hidden-a" value="0.00">
+                <input type="hidden" class="row-volume-hidden-a" value="0.000">
+                <input type="hidden" class="row-total-volume-hidden-a" value="0.000">
+                <input type="hidden" class="row-subtotal-hidden-a" value="0.00">
 
                 <!-- Part B hidden inputs -->
                 <input type="hidden" name="items[${rowIndex}_B][is_split]" value="1">
                 <input type="hidden" name="items[${rowIndex}_B][split_group_id]" value="split_${rowIndex}">
-                <input type="hidden" name="items[${rowIndex}_B][parent_log_id]" value="">
                 <input type="hidden" name="items[${rowIndex}_B][split_side]" value="B">
                 <input type="hidden" name="items[${rowIndex}_B][category]" class="row-cat-hidden-b" value="${data.category}">
                 <input type="hidden" name="items[${rowIndex}_B][grade]" class="row-grade-hidden-b" value="${defaultGradeB}">
                 <input type="hidden" name="items[${rowIndex}_B][length]" class="row-len-hidden-b" value="${defaultLengthB}">
                 <input type="hidden" name="items[${rowIndex}_B][diameter]" class="row-dia-hidden-b" value="${defaultDiaB}">
                 <input type="hidden" name="items[${rowIndex}_B][quantity]" class="row-qty-hidden-b" value="${data.quantity}">
-                <input type="hidden" name="items[${rowIndex}_B][volume]" class="row-volume-hidden-b" value="0.000">
-                <input type="hidden" name="items[${rowIndex}_B][total_volume]" class="row-total-volume-hidden-b" value="0.000">
-                <input type="hidden" name="items[${rowIndex}_B][subtotal]" class="row-subtotal-hidden-b" value="0.00">
+                <input type="hidden" class="row-volume-hidden-b" value="0.000">
+                <input type="hidden" class="row-total-volume-hidden-b" value="0.000">
+                <input type="hidden" class="row-subtotal-hidden-b" value="0.00">
                 </td>
 
                 <td class="px-3 py-3 text-center text-xs text-slate-500 font-mono row-num">1</td>
@@ -722,9 +720,9 @@
 
             tr.innerHTML = `
                 <td hidden>
-                <input type="hidden" name="items[${rowIndex}][volume]" class="row-vol-hidden" value="0.000">
-                <input type="hidden" name="items[${rowIndex}][total_volume]" class="row-total-vol-hidden" value="0.000">
-                <input type="hidden" name="items[${rowIndex}][subtotal]" class="row-subtotal-hidden" value="0.00">
+                <input type="hidden" class="row-vol-hidden" value="0.000">
+                <input type="hidden" class="row-total-vol-hidden" value="0.000">
+                <input type="hidden" class="row-subtotal-hidden" value="0.00">
                 </td>
                 <td class="px-3 py-3 text-center text-xs text-slate-500 font-mono row-num">1</td>
                 

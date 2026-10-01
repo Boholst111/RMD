@@ -265,8 +265,36 @@ class ScalingController extends Controller
     /**
      * Store Scale Sheet and Item Matrix in DB Transaction
      */
+    protected function normalizeWholeNumberQuantities(Request $request): void
+    {
+        $items = $request->input('items');
+        if (! is_array($items)) {
+            return;
+        }
+
+        foreach ($items as &$item) {
+            if (! is_array($item) || ! array_key_exists('quantity', $item)) {
+                continue;
+            }
+
+            $quantity = filter_var($item['quantity'], FILTER_VALIDATE_FLOAT);
+            if ($quantity === false || ! is_finite($quantity) || floor($quantity) !== $quantity) {
+                continue;
+            }
+
+            if ($quantity >= PHP_INT_MIN && $quantity <= PHP_INT_MAX) {
+                $item['quantity'] = sprintf('%.0f', $quantity);
+            }
+        }
+        unset($item);
+
+        $request->merge(['items' => $items]);
+    }
+
     public function store(Request $request)
     {
+        $this->normalizeWholeNumberQuantities($request);
+
         $deductionAliases = [
             'drivers_assistance' => ['driver_assistance'],
             'expenses_deduction' => ['expenses'],
@@ -534,6 +562,8 @@ class ScalingController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $this->normalizeWholeNumberQuantities($request);
+
         $sheet = TruckLoad::findOrFail($id);
         $validated = $request->validate([
             'drivers_assistance' => 'nullable|numeric|min:0|max:999999999999.99',
@@ -849,10 +879,11 @@ class ScalingController extends Controller
         }
 
         foreach ($truckLoad->scaleItems as $item) {
-            $grade = $item->grade ?? 'Good';
+            $grade = trim((string) ($item->grade ?? 'Good'));
+            $isSawmill = str_contains(strtoupper($grade), 'SAWMILL');
             $dia = (int) $item->diameter;
 
-            if ($grade === 'Sawmill' || str_contains($grade, 'Sawmill')) {
+            if ($isSawmill) {
                 $b = 'Sawmill (SM)';
             } elseif ($dia >= 16 && $dia <= 18) {
                 $b = '16-18';
@@ -873,19 +904,15 @@ class ScalingController extends Controller
             $groupedBrackets[$b]['pieces'] += ScaleItem::resolveEffectivePieceCount((float) $item->quantity, (bool) $item->is_split, !is_null($item->parent_log_id));
             $groupedBrackets[$b]['total_volume'] += (float) $item->total_volume;
 
-            $category = $item->wood_category ?? ($item->category ?? 'FALCATA');
-            $rateCategory = $category;
-            if ($grade === 'Sawmill' || str_contains($grade, 'Sawmill')) {
-                $rateCategory = 'SAWMILL';
-            }
-
-            $itemRate = PriceMatrix::matchRate($rateCategory, (float) $item->length, (int) $item->diameter, $grade);
-            if ($groupedBrackets[$b]['rate'] <= 0 && $itemRate > 0) {
-                $groupedBrackets[$b]['rate'] = $itemRate;
-            }
-
             $groupedBrackets[$b]['subtotal'] += (float) $item->subtotal;
         }
+
+        foreach ($groupedBrackets as &$bracket) {
+            if ($bracket['total_volume'] > 0) {
+                $bracket['rate'] = round($bracket['subtotal'] / $bracket['total_volume'], 2);
+            }
+        }
+        unset($bracket);
 
         // Preserve bracket totals even when child split rows have zero piece counts.
         // The subtotal and volume must remain if any positive total_volume is present.

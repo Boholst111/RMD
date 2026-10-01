@@ -336,6 +336,31 @@
     (function(){
         const sheetId = '{{ $sheet->id }}';
         const draftKey = `scaling_edit_draft_${sheetId}`;
+        const rateChangingControls = '.row-cat, .row-cat-select, .row-grade, .row-grade-a, .row-grade-b, .row-len, .row-len-a, .row-len-b, .row-dia, .row-dia-a, .row-dia-b';
+
+        function savedRate(item) {
+            const rate = Number(item.price_per_cu_m);
+            if (item.price_per_cu_m !== null && item.price_per_cu_m !== undefined && Number.isFinite(rate)) {
+                return rate;
+            }
+
+            const volume = Number(item.total_volume);
+            return volume > 0 ? Number(item.subtotal || 0) / volume : 0;
+        }
+
+        function preserveHistoricalRates(row, rates) {
+            if (rates.standard !== undefined) row.dataset.savedRate = String(rates.standard);
+            if (rates.partA !== undefined) row.dataset.savedRateA = String(rates.partA);
+            if (rates.partB !== undefined) row.dataset.savedRateB = String(rates.partB);
+
+            const markRatesDirty = event => {
+                if (event.target.matches(rateChangingControls)) {
+                    row.dataset.historicalRatesDirty = 'true';
+                }
+            };
+            row.addEventListener('input', markRatesDirty, true);
+            row.addEventListener('change', markRatesDirty, true);
+        }
 
         function exportCurrentItems() {
             const out = [];
@@ -451,6 +476,7 @@
                         const rid = rowIndex;
                         const r = document.getElementById(`row-${rid}`);
                         if (r) {
+                            preserveHistoricalRates(r, { standard: savedRate(it) });
                             if (it.volume) r.querySelector('.row-vol-hidden') && (r.querySelector('.row-vol-hidden').value = Number(it.volume).toFixed(3));
                             if (it.total_volume) r.querySelector('.row-total-vol-hidden') && (r.querySelector('.row-total-vol-hidden').value = Number(it.total_volume).toFixed(3));
                             if (it.subtotal) r.querySelector('.row-subtotal-hidden') && (r.querySelector('.row-subtotal-hidden').value = Number(it.subtotal).toFixed(2));
@@ -467,6 +493,10 @@
                         const rid = rowIndex;
                         const r = document.getElementById(`row-${rid}`);
                         if (r) {
+                            preserveHistoricalRates(r, {
+                                partA: savedRate(a),
+                                partB: b ? savedRate(b) : savedRate(a),
+                            });
                             if (a.volume) r.querySelector('.row-volume-hidden-a') && (r.querySelector('.row-volume-hidden-a').value = Number(a.volume).toFixed(3));
                             if (a.total_volume) r.querySelector('.row-total-volume-hidden-a') && (r.querySelector('.row-total-volume-hidden-a').value = Number(a.total_volume).toFixed(3));
                             if (a.subtotal) r.querySelector('.row-subtotal-hidden-a') && (r.querySelector('.row-subtotal-hidden-a').value = Number(a.subtotal).toFixed(2));
@@ -509,6 +539,7 @@
                         const rid = rowIndex;
                         const r = document.getElementById(`row-${rid}`);
                         if (r) {
+                            preserveHistoricalRates(r, { standard: savedRate(it) });
                             if (it.volume) r.querySelector('.row-vol-hidden') && (r.querySelector('.row-vol-hidden').value = Number(it.volume).toFixed(3));
                             if (it.total_volume) r.querySelector('.row-total-vol-hidden') && (r.querySelector('.row-total-vol-hidden').value = Number(it.total_volume).toFixed(3));
                             if (it.subtotal) r.querySelector('.row-subtotal-hidden') && (r.querySelector('.row-subtotal-hidden').value = Number(it.subtotal).toFixed(2));
@@ -525,6 +556,10 @@
                         const rid = rowIndex;
                         const r = document.getElementById(`row-${rid}`);
                         if (r) {
+                            preserveHistoricalRates(r, {
+                                partA: savedRate(a),
+                                partB: b ? savedRate(b) : savedRate(a),
+                            });
                             if (a.volume) r.querySelector('.row-volume-hidden-a') && (r.querySelector('.row-volume-hidden-a').value = Number(a.volume).toFixed(3));
                             if (a.total_volume) r.querySelector('.row-total-volume-hidden-a') && (r.querySelector('.row-total-volume-hidden-a').value = Number(a.total_volume).toFixed(3));
                             if (a.subtotal) r.querySelector('.row-subtotal-hidden-a') && (r.querySelector('.row-subtotal-hidden-a').value = Number(a.subtotal).toFixed(2));

@@ -34,34 +34,26 @@ class PriceMatrix extends Model
         $normalizedCategory = strtoupper(trim($category));
 
         if ($normalizedGrade === 'SAWMILL' || $normalizedGrade === 'SAWMILL (SM)') {
-            $exactSawmillMatch = static::where(function ($q) use ($normalizedCategory) {
-                $q->where('category', $normalizedCategory)
-                  ->orWhere('category', 'SAWMILL');
-            })
-            ->whereBetween('length', [$length - 0.05, $length + 0.05])
-            ->where('dia_min', '<=', $diameter)
-            ->where('dia_max', '>=', $diameter)
-            ->orderByRaw("category = ? DESC", [$normalizedCategory])
-            ->value('price_per_cu_m');
+            $exactSawmillMatch = static::where('category', 'SAWMILL')
+                ->whereBetween('length', [$length - 0.05, $length + 0.05])
+                ->where('dia_min', 0)
+                ->where('dia_max', 0)
+                ->value('price_per_cu_m');
 
             if ($exactSawmillMatch !== null) {
                 return (float) $exactSawmillMatch;
             }
 
-            $fallbackSawmillMatch = static::where(function ($q) use ($normalizedCategory) {
-                $q->where('category', $normalizedCategory)
-                  ->orWhere('category', 'SAWMILL');
-            })
-            ->where('dia_min', '<=', $diameter)
-            ->where('dia_max', '>=', $diameter)
-            ->orderByRaw("category = ? DESC", [$normalizedCategory])
-            ->value('price_per_cu_m');
+            $fallbackSawmillMatch = static::where('category', 'SAWMILL')
+                ->where('dia_min', 0)
+                ->where('dia_max', 0)
+                ->value('price_per_cu_m');
 
             if ($fallbackSawmillMatch !== null) {
                 return (float) $fallbackSawmillMatch;
             }
 
-            return 1800.00;
+            return 0.00;
         }
 
         // Query database for matching category/length/diameter range, preferring exact length matches first.
